@@ -69,6 +69,32 @@ def note_lines(n: int) -> str:
     return f'<div style="margin-top:6px;">{row * max(0, n)}</div>'
 
 
+def notes_panel(n_events: int, override) -> str:
+    """A free-form ruled Notes area that fills the rest of the sheet — the
+    "other half" of the fold. It flows across the fold into the second column
+    (no break-inside:avoid on the lines), so a light day gives Jim a whole
+    panel of blank lines while a heavy day still gets a handful. Scales down as
+    the docket grows so it doesn't spawn a page of empty lines."""
+    if override is not None:
+        n = int(override)
+    else:
+        # Tuned to fill the leftover space of a single folded sheet without
+        # spilling a second page of blank lines: ~17 lines on a 1-event day,
+        # down to a handful once the docket itself fills the sheet. Override
+        # with --fill-lines (or "notes_fill_lines" in the JSON) for a longer
+        # notes section when a second sheet is welcome.
+        n = max(5, 20 - 3 * n_events)
+    if n <= 0:
+        return ""
+    row = f'<div style="height:0.34in;border-bottom:1px solid {LINE};"></div>'
+    return f"""
+    <div style="break-inside:avoid;margin-top:16px;">
+      <div style="font-size:9pt;font-weight:800;letter-spacing:1px;text-transform:uppercase;
+                  color:{RED};border-bottom:2px solid {INK};padding-bottom:4px;">Notes</div>
+    </div>
+    <div style="margin-top:8px;">{row * n}</div>"""
+
+
 def money(v) -> str:
     """Format a number as $1,500. Pass through strings untouched."""
     if v is None or v == "":
@@ -100,13 +126,16 @@ def balance_block(ev: dict) -> str:
     except (TypeError, ValueError):
         bal_num = None
 
+    last_pmt = ev.get("last_payment_date")
+    parts = []
+    if fee not in (None, ""):
+        parts.append(f"fee {money(fee)}")
+    if paid not in (None, ""):
+        parts.append(f"paid {money(paid)}")
+    if last_pmt not in (None, ""):
+        parts.append(f"last pmt {esc(last_pmt)}")
     detail = ""
-    if fee not in (None, "") or paid not in (None, ""):
-        parts = []
-        if fee not in (None, ""):
-            parts.append(f"fee {money(fee)}")
-        if paid not in (None, ""):
-            parts.append(f"paid {money(paid)}")
+    if parts:
         detail = f' <span style="color:{MUTE};font-weight:400;">({" · ".join(parts)})</span>'
 
     owed = money(bal) if bal not in (None, "") else "—"
@@ -151,6 +180,34 @@ def flag_pill(text: str, color: str) -> str:
     )
 
 
+def zoom_chip(ev: dict, mode: str) -> str:
+    """Show the Zoom credentials prominently — the same weight as the IN PERSON
+    notation — whenever the event is remote and carries Zoom info. Hard
+    in-person rooms (mode == in_person) suppress it even if a phantom Zoom ID
+    rode along in the location field, per the firm's 22xx/2005 rule."""
+    zoom = ev.get("zoom")
+    if not zoom or mode in ("in_person", "in-person", "inperson"):
+        return ""
+    return (
+        f'<div style="margin-top:5px;">'
+        f'<span style="font-size:10pt;font-weight:800;color:#fff;background:{GREEN};'
+        f'border-radius:6px;padding:3px 9px;letter-spacing:.2px;">'
+        f'▶ ZOOM · {esc(zoom)}</span></div>'
+    )
+
+
+def calendar_notes(ev: dict) -> str:
+    """The note text carried on the Filevine calendar event, verbatim."""
+    notes = ev.get("notes")
+    if not notes:
+        return ""
+    return (
+        f'<div style="margin-top:4px;font-size:9.5pt;color:{INK};line-height:1.4;'
+        f'background:#F2F2F4;border-radius:6px;padding:5px 8px;">'
+        f'<span style="color:{MUTE};font-weight:700;">Note </span>{esc(notes)}</div>'
+    )
+
+
 def event_card(ev: dict, default_note_lines: int) -> str:
     time = esc(ev.get("time", ""))
     place = esc(ev.get("courthouse", ""))
@@ -159,8 +216,11 @@ def event_card(ev: dict, default_note_lines: int) -> str:
     appearance = esc(ev.get("appearance_type", ""))
     matter = esc(ev.get("matter", ""))
 
-    # in-person vs Zoom pill
+    # in-person vs Zoom pill. A Zoom event with no explicit mode still reads
+    # as remote, so infer "zoom" when Zoom info is present and mode is unset.
     mode = str(ev.get("mode", "")).strip().lower()
+    if not mode and ev.get("zoom"):
+        mode = "zoom"
     pill = ""
     if mode in ("in_person", "in-person", "inperson"):
         pill = flag_pill("in person", RED)
@@ -183,6 +243,8 @@ def event_card(ev: dict, default_note_lines: int) -> str:
         </div>
       </div>
       <div style="font-size:10pt;color:{INK};margin-top:2px;font-weight:600;">{header_bits}</div>
+      {zoom_chip(ev, mode)}
+      {calendar_notes(ev)}
       {stack_line("↻", "Next in room", ev.get("next_in_room"), star=has_value(ev.get("next_in_room")))}
       {stack_line("⌂", "Next at courthouse", ev.get("next_at_courthouse"))}
       {balance_block(ev)}
@@ -191,7 +253,7 @@ def event_card(ev: dict, default_note_lines: int) -> str:
     """
 
 
-def build_html(data: dict, default_note_lines: int) -> str:
+def build_html(data: dict, default_note_lines: int, fill_lines=None) -> str:
     firm = esc(data.get("firm", "Fabbrini Law Group"))
     who = esc(data.get("attorney", "Jim Fabbrini"))
     date_label = esc(data.get("date_label", data.get("date", "")))
@@ -259,6 +321,7 @@ def build_html(data: dict, default_note_lines: int) -> str:
   <div class="docket">
     {cards}
     {gaps_html}
+    {notes_panel(len(events), data.get("notes_fill_lines", fill_lines))}
     <div class="foot">
       Source: Filevine Sync + M365 calendar (live pull) · balances from Filevine.
       Flags follow the firm ruleset (flg-command-brief). Not authoritative for
@@ -321,6 +384,9 @@ def main() -> int:
     ap.add_argument("--out", help="Output PDF path (default: alongside the JSON)")
     ap.add_argument("--open-note-lines", type=int, default=3,
                     help="Default ruled note lines per event (default 3)")
+    ap.add_argument("--fill-lines", type=int, default=None,
+                    help="Ruled lines in the free-form Notes panel that fills the "
+                         "other half of the sheet (default: adaptive to event count)")
     args = ap.parse_args()
 
     with open(args.events, encoding="utf-8") as fh:
@@ -329,7 +395,7 @@ def main() -> int:
     out_pdf = args.out or os.path.splitext(os.path.abspath(args.events))[0] + ".pdf"
     out_html = os.path.splitext(out_pdf)[0] + ".html"
 
-    html_str = build_html(data, args.open_note_lines)
+    html_str = build_html(data, args.open_note_lines, fill_lines=args.fill_lines)
     with open(out_html, "w", encoding="utf-8") as fh:
         fh.write(html_str)
 

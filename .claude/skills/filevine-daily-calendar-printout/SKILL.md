@@ -13,8 +13,14 @@ table or slip in a jacket pocket). Every event carries the four things Jim asked
 1. **↻ Next in room** — the next date/time he is back in that *exact courtroom*.
 2. **⌂ Next at courthouse** — the next date/time he is back in that *building* (any room).
 3. **$ Balance owed** — money still out on the case, **only** for flat-fee case types
-   (criminal, DUI, traffic, license). PI is contingency, so it shows no balance.
-4. **Ruled note lines** under each event for handwriting during the call.
+   (criminal, DUI, traffic, license), with the **last payment date**. PI is contingency, so
+   it shows no balance.
+4. **Ruled note lines** under each event, plus a **Notes panel that fills the other half** of
+   the folded sheet — so the whole page is usable for handwriting during the call.
+
+It also carries, per event, the **note text from the Filevine calendar** and, for remote
+appearances, the **Zoom credentials shown as prominently as the IN PERSON tag** (a filled
+green chip) so Jim can dial in without digging.
 
 This is the *paper* counterpart to `flg-command-brief` (which emails an HTML brief). Same
 firm, same courthouse/room rules — different deliverable. Reuse the ruleset; don't reinvent it.
@@ -44,7 +50,10 @@ Default to **today** in America/Chicago. Honor an explicit day ("tomorrow," "Thu
 Read `references/data-sources.md` first — it has the exact connector calls. In brief:
 
 - **Operational pull:** the target day's events from the **Filevine Sync + M365 calendar**
-  via the Microsoft 365 connector (`outlook_calendar_search` / `read_resource`).
+  via the Microsoft 365 connector (`outlook_calendar_search` / `read_resource`). Capture the
+  event **body/notes** and any **Zoom dial-in** — put the note text in `notes` (verbatim) and
+  the dial-in in `zoom`. Zoom info often lives inside the location/room string or the body, so
+  read both.
 - **Forward pull (today → +120 days), courthouse + room only:** this is what powers
   *↻ Next in room* and *⌂ Next at courthouse*. 120 days, not 30 — continuance and
   trial-setting targets routinely land 6–16 weeks out (RS-9 in the command-brief ruleset).
@@ -68,7 +77,7 @@ For each event, from the 120-day forward pull:
 ### 5. Resolve the balance (flat-fee case types only)
 For **criminal / DUI / traffic / license** matters, resolve what's still owed from Filevine —
 see `references/data-sources.md` ("Balance lookup"). Populate `balance` (and `fee_total` /
-`amount_paid` when available). If you cannot resolve it, leave the money fields absent and add
+`amount_paid` / `last_payment_date` when available). If you cannot resolve it, leave the money fields absent and add
 a line to `data_gaps` — the renderer will print "Balance: unresolved — verify in Filevine"
 rather than inventing a number. **Never guess a balance.** For PI matters, omit the money
 fields entirely (contingency — there is no flat-fee balance to show).
@@ -101,19 +110,35 @@ in half the long way."
       "appearance_type": "App / Resolve",
       "matter": "#5811 Reyes, Marco",
       "mode": "in_person",                 // "in_person" | "zoom" | omit if unknown
+      "zoom": "Mtg 963 6581 2444 · PC 092295", // Zoom creds from the event; shown as a green chip
+      "notes": "State offered supervision — confirm client accepts.", // verbatim Filevine calendar note
       "case_type": "dui",                  // criminal|dui|traffic|license -> balance shown; pi/other -> hidden
       "fee_total": 3500,                    // optional
       "amount_paid": 2000,                  // optional
       "balance": 1500,                      // owed; 0 => "Paid in full"; absent => "unresolved"
+      "last_payment_date": "Jul 3",        // optional; shown in the balance line
       "next_in_room": "Aug 3, 9:00 AM",    // null => none in window
       "next_at_courthouse": "Jul 30, 9:30 AM",
       "flags": ["CW watch"],               // optional small pills (e.g. "CW watch", "transport writ")
-      "note_lines": 3                       // optional; default 3
+      "note_lines": 3                       // optional per-event ruled lines; default 3
     }
   ],
-  "data_gaps": ["#6051 balance unresolved in Filevine — verify before the call."]
+  "data_gaps": ["#6051 balance unresolved in Filevine — verify before the call."],
+  "notes_fill_lines": null                  // optional; override the auto-sized "other half" Notes panel
 }
 ```
+
+- **`zoom`** — set this whenever the appearance is remote and the calendar carries dial-in
+  info (often buried in the location/room or the event body). The renderer shows it as a
+  filled green chip and auto-marks the event ZOOM even if `mode` is unset. A hard-in-person
+  room (Daley 22xx / Rm 2005, CMCs) keeps `mode: "in_person"` and the chip is suppressed —
+  those phantom Zoom IDs don't apply (see `firm-rules.md`).
+- **`notes`** — the Filevine calendar event's note text, verbatim. Don't paraphrase or drop it;
+  it's often where the offer, the CW status, or a transport instruction lives.
+- **`last_payment_date`** — most recent payment date for the matter, shown alongside the balance.
+- **Notes panel** — the renderer auto-appends a ruled Notes area sized to fill the rest of the
+  folded sheet's second half. It shrinks as the docket grows so a normal day stays on one sheet;
+  set `notes_fill_lines` (or pass `--fill-lines N`) to force a specific count.
 
 `assets/sample-events.json` is a complete, working example — render it to see the exact output.
 

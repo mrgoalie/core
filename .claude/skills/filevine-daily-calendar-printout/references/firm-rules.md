@@ -30,6 +30,17 @@ HRG = Hearing · PreLim = Preliminary hearing · ARRAIN = Arraignment · Trial =
 - When a Zoom option genuinely exists, set `mode: "zoom"`; otherwise `mode: "in_person"`.
   If truly unknown, omit `mode` (no pill) and note it in `data_gaps`.
 
+### Zoom credentials get shown, prominently
+
+When an event carries actual dial-in info (meeting ID, passcode, or a Zoom link — often
+tucked into the location/room string or the event body), put it in the event's `zoom` field.
+The renderer prints it as a **filled green chip**, the same visual weight as the IN PERSON tag,
+so Jim can join without hunting. **Exception:** for hard-in-person rooms (Daley 22xx / Rm 2005,
+CMCs, pleas/trials) keep `mode: "in_person"` — the renderer suppresses the chip because any
+Zoom ID listed there is a phantom that doesn't apply. Cook County room Zoom IDs are stable and
+live in the firm's saved directory / Filevine; county rooms (Will/DuPage/Lake) rotate weekly,
+so pull those fresh rather than caching.
+
 ## Case-type detection (decides whether a balance line prints)
 
 The Filevine case-type field isn't always in the calendar data. Infer from signals:

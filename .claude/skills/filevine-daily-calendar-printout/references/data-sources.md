@@ -9,7 +9,11 @@ pull them with the **Microsoft 365 connector** — the same source `flg-command-
 - `mcp__Microsoft_365__outlook_calendar_search` scoped to the target date (America/Chicago).
 - If the connector exposes the calendar as a resource, `mcp__Microsoft_365__read_resource`
   works too. Capture for each event: start time, subject/title, location (courthouse + room),
-  and any body notes (Zoom info, matter #, CW/transport notes).
+  and **the full body/notes**.
+  - **`notes`** ← the event body text, verbatim (the offer, CW status, transport instruction,
+    etc. usually live here). Don't summarize it away.
+  - **`zoom`** ← any dial-in in the body *or* the location/room string (meeting ID + passcode,
+    or a `zoom.us/j/...` link). Suppress it only for hard-in-person rooms (see `firm-rules.md`).
 
 **Forward pull — today → +120 days, courthouse + room only:**
 - Same tool, wider window. You don't need full bodies here — just enough to know, for every
@@ -41,11 +45,12 @@ collection). Read them back through the **Zapier Filevine actions**:
    enabled Zaps; if none is enabled, that's a stated gap, not a guess.
 2. `inspect_zapier_actions({ tool_name })` — resolve the parameter schema (project/matter
    lookup by internal # or client name; the fee/payment collection).
-3. `execute_zapier_read_action(...)` — pull the flat fee and the sum of payments for the
-   matter. Compute `balance = fee_total - amount_paid`.
+3. `execute_zapier_read_action(...)` — pull the flat fee, the sum of payments, and the **date
+   of the most recent payment** for the matter. Compute `balance = fee_total - amount_paid`.
 
-Populate `fee_total`, `amount_paid`, and `balance` when you have them; `balance` alone is fine
-if that's all Filevine returns. **If the balance can't be resolved** (no matching project,
+Populate `fee_total`, `amount_paid`, `balance`, and `last_payment_date` when you have them;
+`balance` alone is fine if that's all Filevine returns. The `last_payment_date` prints next to
+the balance so Jim can see at a glance whether the client has paid recently or gone cold. **If the balance can't be resolved** (no matching project,
 ambiguous match, no fee field, Filevine/Zapier not reachable), leave the money fields absent
 and add a line to `data_gaps`. The renderer then prints "Balance: unresolved — verify in
 Filevine" in amber — which is the correct, honest output. Never invent a number: this figure
