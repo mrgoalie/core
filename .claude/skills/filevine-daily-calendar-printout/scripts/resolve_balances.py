@@ -86,6 +86,11 @@ def _request(method: str, url: str, headers: dict, body: bytes | None = None) ->
             raw = resp.read().decode("utf-8")
     except urllib.error.HTTPError as e:
         detail = e.read().decode("utf-8", "replace")[:400]
+        if e.code in (401, 403):
+            die(3, f"{method} {url} -> HTTP {e.code}: {detail}\n"
+                   "  Auth rejected. Most common cause: the Filevine PAT expired or was "
+                   "revoked — regenerate it (Filevine → profile → API) and update "
+                   "FILEVINE_PAT. Also verify FILEVINE_ORG_ID / FILEVINE_USER_ID.")
         die(3, f"{method} {url} -> HTTP {e.code}: {detail}")
     except urllib.error.URLError as e:
         die(3, f"{method} {url} -> {e.reason}")

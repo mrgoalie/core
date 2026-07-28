@@ -41,7 +41,14 @@ DUI / traffic / license** matters. Payments are logged into Filevine (see the
 collection). There are two ways to read them back; either fills `fee_total`, `amount_paid`,
 `balance`, and `last_payment_date`.
 
-### Route A — Filevine API v2 (automatic, recommended): `scripts/resolve_balances.py`
+### Route A — Filevine API v2 (DEFAULT — most stable): `scripts/resolve_balances.py`
+
+**Use this route.** For a scheduled daily printout it's the stable choice: it's a self-contained
+script with no interactive approval gate, no third-party middleman (Zapier connection re-auths,
+task quotas, action-schema drift), and it's deterministic and offline-testable (`--selftest`).
+The one thing to keep current is the **Filevine PAT** — it can expire; regenerate it and update
+`FILEVINE_PAT` if a run reports an HTTP 401/403 (the script says exactly that). Prefer a
+long-lived PAT and note its rotation date.
 
 The resolver looks matters up by **`filevine_project_id`** (from the event's Filevine deep
 link — the `r/p/NNNNNNN` ref you captured in the calendar pull), so no fuzzy name matching.
@@ -68,10 +75,12 @@ the math offline. Auth uses the standard v2 flow (PAT grant → bearer, with `x-
 `x-fv-userid` headers); confirm the endpoint constants at the top of the script against your
 Filevine region/instance on first run.
 
-### Route B — Zapier Filevine actions (no new credentials)
+### Route B — Zapier Filevine actions (fallback only — no new credentials)
 
-Reuses the firm's existing Filevine connection. Run this at skill-execution time (it uses the
-Zapier MCP tools, which the script can't call):
+Use this only if you can't mint Filevine API keys. It reuses the firm's existing Filevine
+connection but is less stable for automation: the Zapier MCP tools need an interactive approval
+(which a scheduled/headless run can't grant), and it adds a middleman that can re-auth, rate-
+limit, or change action schemas. Run it at skill-execution time (the script can't call MCP):
 
 1. `discover_zapier_actions({ app: "Filevine" })` → the Filevine app (`FilevineCLIAPI`).
 2. `inspect_zapier_actions({ selected_api: "FilevineCLIAPI" })` → pick the read/search action
