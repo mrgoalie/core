@@ -81,12 +81,25 @@ For each event, from the 120-day forward pull:
   window" and suppresses the ★ same-room star. A stated empty is fine; a silent omission is not.
 
 ### 5. Resolve the balance (flat-fee case types only)
-For **criminal / DUI / traffic / license** matters, resolve what's still owed from Filevine —
-see `references/data-sources.md` ("Balance lookup"). Populate `balance` (and `fee_total` /
-`amount_paid` / `last_payment_date` when available). If you cannot resolve it, leave the money fields absent and add
-a line to `data_gaps` — the renderer will print "Balance: unresolved — verify in Filevine"
-rather than inventing a number. **Never guess a balance.** For PI matters, omit the money
-fields entirely (contingency — there is no flat-fee balance to show).
+For **criminal / DUI / traffic / license** matters, resolve what's still owed from Filevine.
+The fastest path is automatic — run the resolver on the docket JSON before rendering:
+
+```bash
+python scripts/resolve_balances.py --in DOCKET.json --out DOCKET.json
+```
+
+It fills `fee_total`, `amount_paid`, `balance`, and `last_payment_date` for every flat-fee
+event that carries a `filevine_project_id` — grab that from the event's Filevine deep link
+during the calendar pull (the `r/p/NNNNNNN` ref). The resolver reads Filevine via the
+**Filevine API v2** using credentials from the environment; `references/data-sources.md` →
+"Balance lookup" has the one-time setup (`--discover` finds the firm's fee field and payment
+collection) and the **Zapier alternative** that reuses the firm's existing Filevine connection
+with no new secrets.
+
+If a balance still can't be resolved (no project id, creds not set, section not found), leave
+the money fields absent and add a line to `data_gaps` — the renderer prints "Balance:
+unresolved — verify in Filevine" rather than inventing a number. **Never guess a balance.**
+For PI matters, omit the money fields entirely (contingency — there is no flat-fee balance).
 
 ### 6. Build the docket JSON and render
 Write a JSON file in the exact shape below, then run the bundled renderer:
@@ -119,6 +132,7 @@ in half the long way."
       "zoom": "Mtg 963 6581 2444 · PC 092295", // Zoom creds from the event; shown as a green chip
       "notes": "State offered supervision — confirm client accepts.", // verbatim Filevine calendar note
       "case_type": "dui",                  // criminal|dui|traffic|license -> balance shown; pi/other -> hidden
+      "filevine_project_id": "10293847",   // from the event's Filevine deep link; lets resolve_balances.py auto-fill the money
       "fee_total": 3500,                    // optional
       "amount_paid": 2000,                  // optional
       "balance": 1500,                      // owed; 0 => "Paid in full"; absent => "unresolved"
@@ -169,8 +183,12 @@ unresolved" is trustworthy; one that prints a made-up number is dangerous at a p
   case-type detection, and the room/courthouse stacking definitions. Defers to
   `flg-command-brief` RS-12 as the source of truth.
 - `references/data-sources.md` — exact connector calls: M365 calendar pull (operational +
-  120-day forward), and the Filevine balance lookup via the Zapier Filevine actions, with
-  the gap-handling fallback.
+  120-day forward), and the Filevine balance lookup — Route A (Filevine API v2 via
+  `resolve_balances.py`) and Route B (Zapier) — with the gap-handling fallback.
+- `scripts/resolve_balances.py` — auto-fills flat-fee `balance` / `fee_total` / `amount_paid`
+  / `last_payment_date` from the Filevine API by `filevine_project_id`. Run it on the docket
+  JSON before rendering. `--discover` finds the firm's fee/payment selectors; `--selftest`
+  checks the math offline. Credentials come from the environment, never the repo.
 - `scripts/build_calendar_pdf.py` — the renderer. Feed it the docket JSON; it owns the
   fold layout (events left, note lines right), colors, and note lines.
 - `assets/sample-events.json` — a ready-to-render example docket.

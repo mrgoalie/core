@@ -37,24 +37,58 @@ and add a `data_gaps` note — the stacking match needs a clean (courthouse, roo
 
 "How much money is still out" = the flat fee agreed minus payments received, for **criminal /
 DUI / traffic / license** matters. Payments are logged into Filevine (see the
-`lawpay-filevine-payment-sync` skill, which writes payments into each matter's payment
-collection). Read them back through the **Zapier Filevine actions**:
+`lawpay-filevine-payment-sync` skill, which writes each payment into the matter's payment
+collection). There are two ways to read them back; either fills `fee_total`, `amount_paid`,
+`balance`, and `last_payment_date`.
 
-1. `discover_zapier_actions({ app: "Filevine" })` — find a read action such as "Find Project"
-   / "Get Project" / "Find Collection Items" (payments/fees). Names vary by the account's
-   enabled Zaps; if none is enabled, that's a stated gap, not a guess.
-2. `inspect_zapier_actions({ tool_name })` — resolve the parameter schema (project/matter
-   lookup by internal # or client name; the fee/payment collection).
-3. `execute_zapier_read_action(...)` — pull the flat fee, the sum of payments, and the **date
-   of the most recent payment** for the matter. Compute `balance = fee_total - amount_paid`.
+### Route A — Filevine API v2 (automatic, recommended): `scripts/resolve_balances.py`
 
-Populate `fee_total`, `amount_paid`, `balance`, and `last_payment_date` when you have them;
-`balance` alone is fine if that's all Filevine returns. The `last_payment_date` prints next to
-the balance so Jim can see at a glance whether the client has paid recently or gone cold. **If the balance can't be resolved** (no matching project,
-ambiguous match, no fee field, Filevine/Zapier not reachable), leave the money fields absent
-and add a line to `data_gaps`. The renderer then prints "Balance: unresolved — verify in
-Filevine" in amber — which is the correct, honest output. Never invent a number: this figure
-gates whether Jim stands for a plea, per the firm's fee-watch rule.
+The resolver looks matters up by **`filevine_project_id`** (from the event's Filevine deep
+link — the `r/p/NNNNNNN` ref you captured in the calendar pull), so no fuzzy name matching.
+
+```bash
+python scripts/resolve_balances.py --in DOCKET.json --out DOCKET.json
+```
+
+**One-time setup.** Set credentials as environment secrets (never commit them):
+`FILEVINE_PAT`, `FILEVINE_CLIENT_ID`, `FILEVINE_CLIENT_SECRET`, `FILEVINE_ORG_ID`,
+`FILEVINE_USER_ID`. Then tell it where this firm keeps the flat fee and the payment ledger —
+Filevine has no universal "balance" field, so these are firm-specific. Discover them once:
+
+```bash
+python scripts/resolve_balances.py --discover --project <a-known-project-id>
+```
+
+That prints the project's fields, sections (Forms), and collections. From the output, set:
+`FV_FEE_SELECTOR` (e.g. `flatFee` or `intake/quotedFee`), `FV_PAYMENTS_COLLECTION` (the
+collection the LawPay sync writes to), and — if the payment rows don't use the defaults —
+`FV_PAYMENT_AMOUNT_FIELD` / `FV_PAYMENT_DATE_FIELD`. The resolver then computes
+`balance = fee − Σ payments` and `last_payment_date = max(payment date)`. `--selftest` checks
+the math offline. Auth uses the standard v2 flow (PAT grant → bearer, with `x-fv-orgid` /
+`x-fv-userid` headers); confirm the endpoint constants at the top of the script against your
+Filevine region/instance on first run.
+
+### Route B — Zapier Filevine actions (no new credentials)
+
+Reuses the firm's existing Filevine connection. Run this at skill-execution time (it uses the
+Zapier MCP tools, which the script can't call):
+
+1. `discover_zapier_actions({ app: "Filevine" })` → the Filevine app (`FilevineCLIAPI`).
+2. `inspect_zapier_actions({ selected_api: "FilevineCLIAPI" })` → pick the read/search action
+   that returns a project and its fee/payment collection; resolve its parameter schema. Enable
+   it with `enable_zapier_action` if it isn't already.
+3. `execute_zapier_read_action(...)` → pull the flat fee, the payments, and the latest payment
+   date for the project. Compute `balance = fee_total − amount_paid` and write the four money
+   fields onto the event.
+
+### Either way
+
+`balance` alone is fine if that's all Filevine returns; `last_payment_date` lets Jim see at a
+glance whether the client has paid recently or gone cold. **If the balance can't be resolved**
+(no project id, no matching project, no fee field, Filevine unreachable), leave the money
+fields absent and add a line to `data_gaps`. The renderer prints "Balance: unresolved — verify
+in Filevine" in amber — the correct, honest output. Never invent a number: this figure gates
+whether Jim stands for a plea, per the firm's fee-watch rule.
 
 For **PI** matters, skip the lookup entirely — contingency fee, no flat-fee balance to show.
 
@@ -67,6 +101,7 @@ in `data_gaps` rather than printing the raw ID.
 
 ## Rendering note
 
-Once the docket JSON is assembled, `scripts/build_calendar_pdf.py` owns everything visual
-(page size, fold line, two 4.25" columns, colors, note lines). It needs no network access —
-it's a pure JSON → PDF/HTML transform — so it runs anywhere Chromium or WeasyPrint is present.
+Once the docket JSON is assembled (and balances resolved), `scripts/build_calendar_pdf.py`
+owns everything visual (page size, fold line, events on the left half, ruled note lines on the
+right half, colors). It needs no network access — a pure JSON → PDF/HTML transform — so it runs
+anywhere Chromium or WeasyPrint is present.
