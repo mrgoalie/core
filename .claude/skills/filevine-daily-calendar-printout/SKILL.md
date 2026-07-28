@@ -15,8 +15,8 @@ table or slip in a jacket pocket). Every event carries the four things Jim asked
 3. **$ Balance owed** — money still out on the case, **only** for flat-fee case types
    (criminal, DUI, traffic, license), with the **last payment date**. PI is contingency, so
    it shows no balance.
-4. **Ruled note lines** under each event, plus a **Notes panel that fills the other half** of
-   the folded sheet — so the whole page is usable for handwriting during the call.
+4. **Ruled note lines** under each event on the left, plus a full **Notes panel on the entire
+   right half** of the fold — reserved for handwriting only, so the whole page is usable.
 
 It also carries, per event, the **note text from the Filevine calendar** and, for remote
 appearances, the **Zoom credentials shown as prominently as the IN PERSON tag** (a filled
@@ -35,10 +35,16 @@ firm, same courthouse/room rules — different deliverable. Reuse the ruleset; d
 
 ## The one hard layout constraint
 
-All readable content must fit inside a **4.25"-wide column** (post-fold panel width). The
-bundled renderer enforces this: it flows the docket into two ~4" columns with the fold line
-drawn down the center, body type ≥ 10.5pt, and nothing spanning the crease. Do not fight the
-layout by hand-writing HTML — feed the renderer a JSON docket and let it place everything.
+The sheet folds down the center, giving two 4.25" panels. The renderer assigns them by rule:
+
+- **LEFT panel = the entire docket.** Every event, the header, data gaps, and footer live
+  here and *only* here. Events never cross the fold. If a day has more events than fit, the
+  left panel paginates onto a **second sheet's left half** — it never spills rightward.
+- **RIGHT panel = ruled note lines only.** No events, ever. It's Jim's writing surface, and
+  it repeats on every page.
+
+Body type stays ≥ 10.5pt and nothing spans the crease. Do not fight the layout by hand-writing
+HTML — feed the renderer a JSON docket and let it place everything.
 
 ## Workflow
 
@@ -120,11 +126,10 @@ in half the long way."
       "next_in_room": "Aug 3, 9:00 AM",    // null => none in window
       "next_at_courthouse": "Jul 30, 9:30 AM",
       "flags": ["CW watch"],               // optional small pills (e.g. "CW watch", "transport writ")
-      "note_lines": 3                       // optional per-event ruled lines; default 3
+      "note_lines": 2                       // optional per-event ruled lines on the left; default 2
     }
   ],
-  "data_gaps": ["#6051 balance unresolved in Filevine — verify before the call."],
-  "notes_fill_lines": null                  // optional; override the auto-sized "other half" Notes panel
+  "data_gaps": ["#6051 balance unresolved in Filevine — verify before the call."]
 }
 ```
 
@@ -136,9 +141,9 @@ in half the long way."
 - **`notes`** — the Filevine calendar event's note text, verbatim. Don't paraphrase or drop it;
   it's often where the offer, the CW status, or a transport instruction lives.
 - **`last_payment_date`** — most recent payment date for the matter, shown alongside the balance.
-- **Notes panel** — the renderer auto-appends a ruled Notes area sized to fill the rest of the
-  folded sheet's second half. It shrinks as the docket grows so a normal day stays on one sheet;
-  set `notes_fill_lines` (or pass `--fill-lines N`) to force a specific count.
+- **`note_lines`** — optional per-event ruled lines on the *left* (default 2), for jotting the
+  disposition next to the case. The whole *right* half is a separate ruled Notes panel that the
+  renderer always draws and repeats on every page — no configuration needed.
 
 `assets/sample-events.json` is a complete, working example — render it to see the exact output.
 
@@ -167,5 +172,5 @@ unresolved" is trustworthy; one that prints a made-up number is dangerous at a p
   120-day forward), and the Filevine balance lookup via the Zapier Filevine actions, with
   the gap-handling fallback.
 - `scripts/build_calendar_pdf.py` — the renderer. Feed it the docket JSON; it owns the
-  fold layout, columns, colors, and note lines.
+  fold layout (events left, note lines right), colors, and note lines.
 - `assets/sample-events.json` — a ready-to-render example docket.

@@ -19,8 +19,7 @@
       "balance": 1500,
       "last_payment_date": "Jul 3",
       "next_in_room": "Aug 3, 9:00 AM",
-      "next_at_courthouse": "Jul 30, 9:30 AM",
-      "note_lines": 3
+      "next_at_courthouse": "Jul 30, 9:30 AM"
     },
     {
       "time": "9:00",
@@ -32,8 +31,7 @@
       "notes": "Bring courtesy copy of the Rule 26 disclosures.",
       "case_type": "pi",
       "next_in_room": null,
-      "next_at_courthouse": "Jul 30, 9:30 AM",
-      "note_lines": 3
+      "next_at_courthouse": "Jul 30, 9:30 AM"
     },
     {
       "time": "9:30",
@@ -51,8 +49,9 @@
       "last_payment_date": "Jun 19",
       "next_in_room": "Sep 9, 9:30 AM",
       "next_at_courthouse": "Aug 12, 1:30 PM",
-      "flags": ["CW watch"],
-      "note_lines": 3
+      "flags": [
+        "CW watch"
+      ]
     },
     {
       "time": "1:00",
@@ -66,8 +65,9 @@
       "balance": null,
       "next_in_room": null,
       "next_at_courthouse": "Aug 20, 9:00 AM",
-      "flags": ["transport writ"],
-      "note_lines": 4
+      "flags": [
+        "transport writ"
+      ]
     }
   ],
   "data_gaps": [

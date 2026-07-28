@@ -64,35 +64,11 @@ def esc(value) -> str:
 # HTML building
 # --------------------------------------------------------------------------- #
 def note_lines(n: int) -> str:
-    """n ruled lines sized so a pen fits between them."""
-    row = f'<div style="height:0.30in;border-bottom:1px solid {LINE};"></div>'
-    return f'<div style="margin-top:6px;">{row * max(0, n)}</div>'
-
-
-def notes_panel(n_events: int, override) -> str:
-    """A free-form ruled Notes area that fills the rest of the sheet — the
-    "other half" of the fold. It flows across the fold into the second column
-    (no break-inside:avoid on the lines), so a light day gives Jim a whole
-    panel of blank lines while a heavy day still gets a handful. Scales down as
-    the docket grows so it doesn't spawn a page of empty lines."""
-    if override is not None:
-        n = int(override)
-    else:
-        # Tuned to fill the leftover space of a single folded sheet without
-        # spilling a second page of blank lines: ~17 lines on a 1-event day,
-        # down to a handful once the docket itself fills the sheet. Override
-        # with --fill-lines (or "notes_fill_lines" in the JSON) for a longer
-        # notes section when a second sheet is welcome.
-        n = max(5, 20 - 3 * n_events)
-    if n <= 0:
-        return ""
-    row = f'<div style="height:0.34in;border-bottom:1px solid {LINE};"></div>'
-    return f"""
-    <div style="break-inside:avoid;margin-top:16px;">
-      <div style="font-size:9pt;font-weight:800;letter-spacing:1px;text-transform:uppercase;
-                  color:{RED};border-bottom:2px solid {INK};padding-bottom:4px;">Notes</div>
-    </div>
-    <div style="margin-top:8px;">{row * n}</div>"""
+    """n ruled lines sized so a pen fits between them (per-event, on the left
+    panel). The whole right half of the sheet is also note lines, so a couple
+    per event is enough to jot the disposition next to the case."""
+    row = f'<div style="height:0.28in;border-bottom:1px solid {LINE};"></div>'
+    return f'<div style="margin-top:5px;">{row * max(0, n)}</div>'
 
 
 def money(v) -> str:
@@ -234,15 +210,15 @@ def event_card(ev: dict, default_note_lines: int) -> str:
     header_bits = " · ".join(b for b in [appearance, matter] if b)
 
     return f"""
-    <div style="break-inside:avoid;page-break-inside:avoid;margin-bottom:12px;
-                padding-bottom:8px;border-bottom:2px solid {INK};">
+    <div style="break-inside:avoid;page-break-inside:avoid;margin-bottom:9px;
+                padding-bottom:6px;border-bottom:1.5px solid {INK};">
       <div style="display:flex;align-items:baseline;">
-        <div style="font-size:13pt;font-weight:800;color:{RED};min-width:0.75in;">{time}</div>
-        <div style="font-size:11.5pt;font-weight:700;color:{INK};line-height:1.25;">
+        <div style="font-size:12.5pt;font-weight:800;color:{RED};min-width:0.7in;">{time}</div>
+        <div style="font-size:11pt;font-weight:700;color:{INK};line-height:1.2;">
           {place}{room_txt}{pill}{extra_pills}
         </div>
       </div>
-      <div style="font-size:10pt;color:{INK};margin-top:2px;font-weight:600;">{header_bits}</div>
+      <div style="font-size:9.5pt;color:{INK};margin-top:1px;font-weight:600;">{header_bits}</div>
       {zoom_chip(ev, mode)}
       {calendar_notes(ev)}
       {stack_line("↻", "Next in room", ev.get("next_in_room"), star=has_value(ev.get("next_in_room")))}
@@ -253,7 +229,7 @@ def event_card(ev: dict, default_note_lines: int) -> str:
     """
 
 
-def build_html(data: dict, default_note_lines: int, fill_lines=None) -> str:
+def build_html(data: dict, default_note_lines: int) -> str:
     firm = esc(data.get("firm", "Fabbrini Law Group"))
     who = esc(data.get("attorney", "Jim Fabbrini"))
     date_label = esc(data.get("date_label", data.get("date", "")))
@@ -281,6 +257,15 @@ def build_html(data: dict, default_note_lines: int, fill_lines=None) -> str:
 
     generated = esc(data.get("generated", ""))
 
+    # Layout contract (do not "improve" back into a flowing two-column list):
+    #   LEFT half of the fold  = ALL events, header, gaps, footer. Nothing else.
+    #   RIGHT half of the fold = ruled note lines ONLY, on every page.
+    # The left panel is normal block flow constrained to the left half's width, so
+    # a huge day simply paginates onto a second sheet's LEFT half — events never
+    # cross the fold. The right panel is a fixed element, which Chromium repeats on
+    # every printed page, filled with hairline rules via a repeating gradient so it
+    # fills whatever height the page has. The fold sits at the page's exact center
+    # (4.25in); left/right panels are the halves minus a small gutter.
     return f"""<!doctype html>
 <html><head><meta charset="utf-8">
 <style>
@@ -293,35 +278,50 @@ def build_html(data: dict, default_note_lines: int, fill_lines=None) -> str:
   /* Fold line down the exact center of the sheet (4.25in from each edge). */
   .fold {{ position: fixed; top: 0; bottom: 0; left: 50%;
            border-left: 1px dashed #BBB; }}
-  .fold::after {{ content: "fold"; position: absolute; top: 0.15in; left: 3px;
-                  font-size: 6.5pt; letter-spacing: 1px; text-transform: uppercase;
-                  color: #BBB; }}
+  .fold::after {{ content: "fold"; position: fixed; top: 0.12in; left: 50%;
+                  margin-left: 3px; font-size: 6.5pt; letter-spacing: 1px;
+                  text-transform: uppercase; color: #BBB; }}
+
+  /* LEFT panel: all docket content, constrained to the left half so it can never
+     spill across the fold; overflow paginates to the next sheet's left half. */
+  .events {{ width: 3.75in; }}
 
   .head {{ border-bottom: 3px solid {RED}; padding-bottom: 6px; margin-bottom: 10px; }}
-  .firm {{ font-size: 8pt; font-weight: 800; letter-spacing: 1.4px;
-           text-transform: uppercase; color: {RED}; }}
-  .date {{ font-size: 19pt; font-weight: 800; letter-spacing: -0.4px; color: {INK};
+  .firm {{ font-size: 8pt; font-weight: 800; letter-spacing: 0.6px;
+           text-transform: uppercase; color: {RED}; white-space: nowrap; }}
+  .date {{ font-size: 18pt; font-weight: 800; letter-spacing: -0.4px; color: {INK};
            margin-top: 2px; }}
-  .sub {{ font-size: 9pt; color: {MUTE}; margin-top: 1px; }}
-
-  /* Two 4"-ish columns so each folded panel is self-contained and readable. */
-  .docket {{ column-count: 2; column-gap: 0.5in; column-fill: auto; }}
+  .sub {{ font-size: 8.5pt; color: {MUTE}; margin-top: 1px; }}
 
   .foot {{ font-size: 7.5pt; color: {MUTE}; line-height: 1.5;
            margin-top: 10px; border-top: 1px solid #DDD; padding-top: 5px;
            break-inside: avoid; }}
+
+  /* RIGHT panel: note lines only. Fixed => repeats on every page. Crisp
+     border-bottom rules (a CSS gradient rasterizes into fuzzy bands in print). */
+  .notes {{ position: fixed; top: 0; bottom: 0; left: 4.4in; right: 0; }}
+  .notes-hd {{ font-size: 9pt; font-weight: 800; letter-spacing: 1px;
+               text-transform: uppercase; color: {RED};
+               border-bottom: 2px solid {INK}; padding-bottom: 4px; }}
+  .notes-lines {{ margin-top: 0.10in; }}
+  .notes-lines > div {{ height: 0.34in; border-bottom: 1px solid {LINE}; }}
 </style></head>
 <body>
   <div class="fold"></div>
-  <div class="head">
-    <div class="firm">{firm} · Daily Court Calendar · {who}</div>
-    <div class="date">{date_label}</div>
-    <div class="sub">Print &amp; fold in half lengthwise · ↻ next in room · ⌂ next at courthouse · $ balance owed</div>
+
+  <div class="notes">
+    <div class="notes-hd">Notes</div>
+    <div class="notes-lines">{'<div></div>' * 27}</div>
   </div>
-  <div class="docket">
+
+  <div class="events">
+    <div class="head">
+      <div class="firm">{firm} · {who}</div>
+      <div class="date">{date_label}</div>
+      <div class="sub">Daily Court Calendar · print &amp; fold lengthwise · ↻ next in room · ⌂ next at courthouse · $ balance owed</div>
+    </div>
     {cards}
     {gaps_html}
-    {notes_panel(len(events), data.get("notes_fill_lines", fill_lines))}
     <div class="foot">
       Source: Filevine Sync + M365 calendar (live pull) · balances from Filevine.
       Flags follow the firm ruleset (flg-command-brief). Not authoritative for
@@ -382,11 +382,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("events", help="Path to the events JSON file")
     ap.add_argument("--out", help="Output PDF path (default: alongside the JSON)")
-    ap.add_argument("--open-note-lines", type=int, default=3,
-                    help="Default ruled note lines per event (default 3)")
-    ap.add_argument("--fill-lines", type=int, default=None,
-                    help="Ruled lines in the free-form Notes panel that fills the "
-                         "other half of the sheet (default: adaptive to event count)")
+    ap.add_argument("--open-note-lines", type=int, default=2,
+                    help="Ruled note lines under each event on the left panel (default 2)")
     args = ap.parse_args()
 
     with open(args.events, encoding="utf-8") as fh:
@@ -395,7 +392,7 @@ def main() -> int:
     out_pdf = args.out or os.path.splitext(os.path.abspath(args.events))[0] + ".pdf"
     out_html = os.path.splitext(out_pdf)[0] + ".html"
 
-    html_str = build_html(data, args.open_note_lines, fill_lines=args.fill_lines)
+    html_str = build_html(data, args.open_note_lines)
     with open(out_html, "w", encoding="utf-8") as fh:
         fh.write(html_str)
 
