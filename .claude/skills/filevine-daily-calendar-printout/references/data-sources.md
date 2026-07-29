@@ -57,10 +57,11 @@ link — the `r/p/NNNNNNN` ref you captured in the calendar pull), so no fuzzy n
 python scripts/resolve_balances.py --in DOCKET.json --out DOCKET.json
 ```
 
-**One-time setup.** Set credentials as environment secrets (never commit them):
-`FILEVINE_PAT`, `FILEVINE_CLIENT_ID`, `FILEVINE_CLIENT_SECRET`, `FILEVINE_ORG_ID`,
-`FILEVINE_USER_ID`. Then tell it where this firm keeps the flat fee and the payment ledger —
-Filevine has no universal "balance" field, so these are firm-specific. Discover them once:
+**One-time setup — full step-by-step is in `references/filevine-setup.md`.** In short: set
+credentials as environment secrets (never commit them): `FILEVINE_PAT`, `FILEVINE_CLIENT_ID`,
+`FILEVINE_CLIENT_SECRET`, `FILEVINE_ORG_ID`, `FILEVINE_USER_ID` (run `--whoami` to get the last
+two). Then tell it where this firm keeps the flat fee and the payment ledger — Filevine has no
+universal "balance" field, so these are firm-specific. Discover them once:
 
 ```bash
 python scripts/resolve_balances.py --discover --project <a-known-project-id>

@@ -138,6 +138,15 @@ def api_get(path: str, token: str, params: dict | None = None) -> dict:
     return _request("GET", url, _auth_headers(token))
 
 
+def whoami(token: str) -> dict:
+    """Return {userId, orgs:[...]} using the org-agnostic utils endpoint —
+    needs only the bearer token, not the org/user ids we're trying to find."""
+    url = f"{API_BASE}/utils/GetUserOrgsWithToken"
+    hdr = {"Authorization": f"Bearer {token}",
+           "Content-Type": "application/json", "Accept": "application/json"}
+    return _request("POST", url, hdr, b"{}")
+
+
 # --------------------------------------------------------------------------- #
 # Field extraction
 # --------------------------------------------------------------------------- #
@@ -227,6 +236,27 @@ def resolve_financials(project_id: str, token: str) -> dict:
 # --------------------------------------------------------------------------- #
 # Commands
 # --------------------------------------------------------------------------- #
+def cmd_whoami() -> int:
+    """Fetch the Org ID and User ID for the FILEVINE_* credentials in the env,
+    so you don't have to hunt them down in the Filevine UI."""
+    token = get_token()  # needs only PAT + client id/secret
+    data = whoami(token)
+    print(json.dumps(data, indent=2)[:4000])
+    user = data.get("user", data)
+    uid = user.get("userId") or user.get("UserId") or user.get("id")
+    orgs = data.get("orgs") or data.get("Orgs") or []
+    print("\n# Set these:")
+    if uid:
+        print(f"export FILEVINE_USER_ID={uid}")
+    for o in orgs:
+        oid = o.get("orgId") or o.get("OrgId") or o.get("id")
+        name = o.get("name") or o.get("Name") or ""
+        print(f"export FILEVINE_ORG_ID={oid}   # {name}")
+    if not uid and not orgs:
+        print("# (Couldn't parse ids from the response above — read them off the raw JSON.)")
+    return 0
+
+
 def cmd_discover(project_id: str) -> int:
     token = get_token()
     print(f"# Project {project_id} — core fields:")
@@ -290,6 +320,8 @@ def cmd_selftest() -> int:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--whoami", action="store_true",
+                    help="Print your Filevine Org ID and User ID from PAT + keys")
     ap.add_argument("--discover", action="store_true", help="Dump a project's sections/collections")
     ap.add_argument("--project", help="Filevine project id (with --discover)")
     ap.add_argument("--in", dest="in_path", help="Input docket JSON")
@@ -299,6 +331,8 @@ def main() -> int:
 
     if args.selftest:
         return cmd_selftest()
+    if args.whoami:
+        return cmd_whoami()
     if args.discover:
         if not args.project:
             ap.error("--discover requires --project")

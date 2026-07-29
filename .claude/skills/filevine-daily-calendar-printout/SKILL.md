@@ -187,8 +187,11 @@ unresolved" is trustworthy; one that prints a made-up number is dangerous at a p
   `resolve_balances.py`) and Route B (Zapier) — with the gap-handling fallback.
 - `scripts/resolve_balances.py` — auto-fills flat-fee `balance` / `fee_total` / `amount_paid`
   / `last_payment_date` from the Filevine API by `filevine_project_id`. Run it on the docket
-  JSON before rendering. `--discover` finds the firm's fee/payment selectors; `--selftest`
-  checks the math offline. Credentials come from the environment, never the repo.
+  JSON before rendering. `--whoami` prints your org/user IDs; `--discover` finds the firm's
+  fee/payment selectors; `--selftest` checks the math offline. Credentials come from the
+  environment, never the repo.
+- `references/filevine-setup.md` — the one-time Filevine setup, step by step: getting the API
+  key/secret and PAT, finding your org/user IDs, and pinning the fee/payment selectors.
 - `scripts/build_calendar_pdf.py` — the renderer. Feed it the docket JSON; it owns the
   fold layout (events left, note lines right), colors, and note lines.
 - `assets/sample-events.json` — a ready-to-render example docket.
