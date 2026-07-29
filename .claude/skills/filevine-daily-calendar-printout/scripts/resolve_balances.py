@@ -100,16 +100,18 @@ def _request(method: str, url: str, headers: dict, body: bytes | None = None) ->
 def get_token() -> str:
     pat = os.environ.get("FILEVINE_PAT")
     cid = os.environ.get("FILEVINE_CLIENT_ID")
-    secret = os.environ.get("FILEVINE_CLIENT_SECRET")
-    if not (pat and cid and secret):
-        die(2, "Missing FILEVINE_PAT / FILEVINE_CLIENT_ID / FILEVINE_CLIENT_SECRET")
-    form = urllib.parse.urlencode({
+    secret = os.environ.get("FILEVINE_CLIENT_SECRET")  # optional
+    if not (pat and cid):
+        die(2, "Missing FILEVINE_PAT / FILEVINE_CLIENT_ID")
+    fields = {
         "grant_type": "personal_access_token",
         "token": pat,
         "scope": SCOPE,
         "client_id": cid,
-        "client_secret": secret,
-    }).encode()
+    }
+    if secret:  # include only if the org's PAT flow requires a client secret
+        fields["client_secret"] = secret
+    form = urllib.parse.urlencode(fields).encode()
     data = _request("POST", IDENTITY_URL,
                     {"Content-Type": "application/x-www-form-urlencoded"}, form)
     tok = data.get("access_token")
