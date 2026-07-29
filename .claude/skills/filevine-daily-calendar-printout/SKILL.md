@@ -82,21 +82,19 @@ For each event, from the 120-day forward pull:
 
 ### 5. Resolve the balance (flat-fee case types only)
 For **criminal / DUI / traffic / license** matters, resolve what's still owed from Filevine.
-The fastest path is automatic — run the resolver on the docket JSON before rendering:
+**This firm uses the Zapier route** — it reuses the existing Filevine↔Zapier connection (the
+one `lawpay-filevine-payment-sync` already runs on), so no Filevine API keys are needed. At
+skill-execution time, read each flat-fee matter's fee + payments through the Zapier Filevine
+actions and fill `fee_total`, `amount_paid`, `balance`, and `last_payment_date`. Look matters
+up by `filevine_project_id` (the `r/p/NNNNNNN` ref grabbed from the event's Filevine deep link
+during the calendar pull). The full procedure — including reusing the LawPay-sync skill's
+Zapier instructions to get the exact payment collection/field keys — is in
+`references/data-sources.md` → "Balance lookup, Route A."
 
-```bash
-python scripts/resolve_balances.py --in DOCKET.json --out DOCKET.json
-```
+`scripts/resolve_balances.py` (Route B) is the Filevine-API alternative, kept for a possible
+future fully-unattended scheduled run; it's not needed for the interactive workflow.
 
-It fills `fee_total`, `amount_paid`, `balance`, and `last_payment_date` for every flat-fee
-event that carries a `filevine_project_id` — grab that from the event's Filevine deep link
-during the calendar pull (the `r/p/NNNNNNN` ref). The resolver reads Filevine via the
-**Filevine API v2** using credentials from the environment; `references/data-sources.md` →
-"Balance lookup" has the one-time setup (`--discover` finds the firm's fee field and payment
-collection) and the **Zapier alternative** that reuses the firm's existing Filevine connection
-with no new secrets.
-
-If a balance still can't be resolved (no project id, creds not set, section not found), leave
+If a balance can't be resolved (no project id, Filevine unreachable, matter not found), leave
 the money fields absent and add a line to `data_gaps` — the renderer prints "Balance:
 unresolved — verify in Filevine" rather than inventing a number. **Never guess a balance.**
 For PI matters, omit the money fields entirely (contingency — there is no flat-fee balance).
@@ -183,15 +181,14 @@ unresolved" is trustworthy; one that prints a made-up number is dangerous at a p
   case-type detection, and the room/courthouse stacking definitions. Defers to
   `flg-command-brief` RS-12 as the source of truth.
 - `references/data-sources.md` — exact connector calls: M365 calendar pull (operational +
-  120-day forward), and the Filevine balance lookup — Route A (Filevine API v2 via
-  `resolve_balances.py`) and Route B (Zapier) — with the gap-handling fallback.
-- `scripts/resolve_balances.py` — auto-fills flat-fee `balance` / `fee_total` / `amount_paid`
-  / `last_payment_date` from the Filevine API by `filevine_project_id`. Run it on the docket
-  JSON before rendering. `--whoami` prints your org/user IDs; `--discover` finds the firm's
-  fee/payment selectors; `--selftest` checks the math offline. Credentials come from the
-  environment, never the repo.
-- `references/filevine-setup.md` — the one-time Filevine setup, step by step: getting the API
-  key/secret and PAT, finding your org/user IDs, and pinning the fee/payment selectors.
+  120-day forward), and the Filevine balance lookup — **Route A (Zapier, the firm's default)**
+  and Route B (Filevine API script, for unattended runs) — with the gap-handling fallback.
+- `scripts/resolve_balances.py` — Route B only: auto-fills flat-fee `balance` / `fee_total` /
+  `amount_paid` / `last_payment_date` from the Filevine API by `filevine_project_id`, for a
+  future fully-unattended scheduled run. Not used by the default interactive (Zapier) workflow.
+  `--whoami` / `--discover` / `--selftest` help set it up; credentials come from the environment.
+- `references/filevine-setup.md` — one-time Filevine API setup for Route B only (API key/PAT,
+  org/user IDs, fee/payment selectors). Not needed for the Zapier default.
 - `scripts/build_calendar_pdf.py` — the renderer. Feed it the docket JSON; it owns the
   fold layout (events left, note lines right), colors, and note lines.
 - `assets/sample-events.json` — a ready-to-render example docket.

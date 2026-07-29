@@ -38,58 +38,45 @@ and add a `data_gaps` note — the stacking match needs a clean (courthouse, roo
 "How much money is still out" = the flat fee agreed minus payments received, for **criminal /
 DUI / traffic / license** matters. Payments are logged into Filevine (see the
 `lawpay-filevine-payment-sync` skill, which writes each payment into the matter's payment
-collection). There are two ways to read them back; either fills `fee_total`, `amount_paid`,
-`balance`, and `last_payment_date`.
+collection). Either route below fills `fee_total`, `amount_paid`, `balance`, and
+`last_payment_date`.
 
-### Route A — Filevine API v2 (DEFAULT — most stable): `scripts/resolve_balances.py`
+### Route A — Zapier Filevine actions (DEFAULT for this firm — no new credentials)
 
-**Use this route.** For a scheduled daily printout it's the stable choice: it's a self-contained
-script with no interactive approval gate, no third-party middleman (Zapier connection re-auths,
-task quotas, action-schema drift), and it's deterministic and offline-testable (`--selftest`).
-The one thing to keep current is the **Filevine PAT** — it can expire; regenerate it and update
-`FILEVINE_PAT` if a run reports an HTTP 401/403 (the script says exactly that). Prefer a
-long-lived PAT and note its rotation date.
+**Use this route.** It reuses the firm's **existing Filevine↔Zapier connection** (the
+`zapier@filevine-cpi-service-accounts` account already used by `lawpay-filevine-payment-sync`),
+so there is nothing new to create on the Filevine side — no PAT, no Client ID/Secret, no
+org/user id. For how Jim actually uses this skill (asking Claude interactively), the one
+tradeoff — an MCP approval prompt — is a non-issue: he's present to approve. Run it at
+skill-execution time (a plain script can't call MCP):
 
-The resolver looks matters up by **`filevine_project_id`** (from the event's Filevine deep
-link — the `r/p/NNNNNNN` ref you captured in the calendar pull), so no fuzzy name matching.
+1. **The payment collection is already known.** `lawpay-filevine-payment-sync` writes every
+   payment into a specific Filevine payment collection/section. Load that skill's Zapier
+   instructions first — `get_zapier_skill("log lawpay payment to filevine")` — to read the exact
+   **project/collection/section identifiers and the amount + date field keys** it uses. Reading
+   balances is the mirror image of that write, against the same collection.
+2. `discover_zapier_actions({ app: "Filevine" })` → the Filevine app (`FilevineCLIAPI`;
+   1 read / 9 search / 10 write actions).
+3. `inspect_zapier_actions({ selected_api: "FilevineCLIAPI" })` → choose the action that reads a
+   project's fee and its payment collection. Prefer a Filevine **"API Request"** action if one is
+   enabled (it can GET `core/projects/{id}` and `.../Collections/{payments}` directly through the
+   Zapier connection); otherwise use **"Find Project"** + a collection-item **search** action.
+   `enable_zapier_action` it if needed, then resolve the parameter schema.
+4. Look the matter up by **`filevine_project_id`** (the `r/p/NNNNNNN` ref captured in the
+   calendar pull) — no fuzzy name matching.
+5. `execute_zapier_read_action(...)` → pull the flat fee, the payment rows, and the latest
+   payment date. Compute `balance = fee_total − Σ payments` and `last_payment_date = max(date)`,
+   then write the four money fields onto the event.
 
-```bash
-python scripts/resolve_balances.py --in DOCKET.json --out DOCKET.json
-```
+Once the exact action + field keys are confirmed on the first live run, record them here so
+future runs skip the discovery step.
 
-**One-time setup — full step-by-step is in `references/filevine-setup.md`.** In short: set
-credentials as environment secrets (never commit them): `FILEVINE_PAT`, `FILEVINE_CLIENT_ID`,
-`FILEVINE_CLIENT_SECRET`, `FILEVINE_ORG_ID`, `FILEVINE_USER_ID` (run `--whoami` to get the last
-two). Then tell it where this firm keeps the flat fee and the payment ledger — Filevine has no
-universal "balance" field, so these are firm-specific. Discover them once:
+### Route B — Filevine API v2 script (for unattended automation): `scripts/resolve_balances.py`
 
-```bash
-python scripts/resolve_balances.py --discover --project <a-known-project-id>
-```
-
-That prints the project's fields, sections (Forms), and collections. From the output, set:
-`FV_FEE_SELECTOR` (e.g. `flatFee` or `intake/quotedFee`), `FV_PAYMENTS_COLLECTION` (the
-collection the LawPay sync writes to), and — if the payment rows don't use the defaults —
-`FV_PAYMENT_AMOUNT_FIELD` / `FV_PAYMENT_DATE_FIELD`. The resolver then computes
-`balance = fee − Σ payments` and `last_payment_date = max(payment date)`. `--selftest` checks
-the math offline. Auth uses the standard v2 flow (PAT grant → bearer, with `x-fv-orgid` /
-`x-fv-userid` headers); confirm the endpoint constants at the top of the script against your
-Filevine region/instance on first run.
-
-### Route B — Zapier Filevine actions (fallback only — no new credentials)
-
-Use this only if you can't mint Filevine API keys. It reuses the firm's existing Filevine
-connection but is less stable for automation: the Zapier MCP tools need an interactive approval
-(which a scheduled/headless run can't grant), and it adds a middleman that can re-auth, rate-
-limit, or change action schemas. Run it at skill-execution time (the script can't call MCP):
-
-1. `discover_zapier_actions({ app: "Filevine" })` → the Filevine app (`FilevineCLIAPI`).
-2. `inspect_zapier_actions({ selected_api: "FilevineCLIAPI" })` → pick the read/search action
-   that returns a project and its fee/payment collection; resolve its parameter schema. Enable
-   it with `enable_zapier_action` if it isn't already.
-3. `execute_zapier_read_action(...)` → pull the flat fee, the payments, and the latest payment
-   date for the project. Compute `balance = fee_total − amount_paid` and write the four money
-   fields onto the event.
+Only needed if this ever runs **fully headless on a schedule** with nobody to approve the MCP
+prompt. It's a self-contained script (no middleman, deterministic, `--selftest`) but requires
+minting Filevine API credentials — see `references/filevine-setup.md`. Not required for the
+default interactive workflow above.
 
 ### Either way
 
