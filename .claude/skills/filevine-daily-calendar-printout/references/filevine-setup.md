@@ -76,9 +76,42 @@ ledger in its own section/collection. Pin them once:
 > Tip: the `--discover` output lists section and collection **selectors** (the API keys) next to
 > their display names — match the display name you saw in the UI to grab the right selector.
 
+## Step 4.5 — Allow Filevine through the environment's network (REQUIRED)
+
+Claude Code cloud environments default to **Trusted** network access, which permits package
+registries only — **Filevine is blocked**, so the resolver silently fails to connect until you
+change this. In the environment settings dialog (same place as the variables — see Step 5),
+set **Network access** to **Custom** and add these to **Allowed domains** (one per line), then
+keep "Also include default list of common package managers" checked:
+
+```
+identity.filevine.com
+*.filevine.com
+api.filevine.io
+*.filevine.io
+```
+
+(`identity.filevine.com` is the token host; the API gateway is `api.filevine.io`. The
+wildcards cover region/subdomain variants. If you'd rather not maintain a list, **Full** access
+also works.)
+
 ## Step 5 — Set the environment and run
 
-Put all seven+ values where the skill runs (shell profile, cron env, or a secrets manager —
+**In Claude Code on the web** (the usual case), these go in the environment's
+**Environment variables** box, not a shell — at claude.ai/code, click the cloud/environment
+name above the message box → gear icon on your environment → paste them (one `KEY=value` per
+line) → save → start a **new** session so they load. Note: this box is not a secret vault
+(values are visible to anyone who uses the environment), so use the rotatable PAT and don't
+share sessions that used it. Values:
+
+```bash
+FILEVINE_PAT=...            FILEVINE_CLIENT_ID=...      FILEVINE_CLIENT_SECRET=...
+FILEVINE_ORG_ID=...         FILEVINE_USER_ID=...
+FV_FEE_SELECTOR=flatFee     FV_PAYMENTS_COLLECTION=payments
+# FV_PAYMENT_AMOUNT_FIELD=amount   FV_PAYMENT_DATE_FIELD=date   # only if non-default
+```
+
+If instead you run the script in a plain shell/cron, `export` the same values (still
 **never commit them**):
 
 ```bash
@@ -107,7 +140,9 @@ python scripts/build_calendar_pdf.py DOCKET.json --out daily-calendar.pdf
 - **PAT rotation is the only recurring task.** If a run fails with HTTP 401/403, the script tells
   you the PAT likely expired — regenerate it (Step 2) and update `FILEVINE_PAT`. Prefer the
   longest-lived PAT your org allows and calendar its rotation date.
-- Credentials live only in the environment/secrets store, never in the repo or the docket JSON.
-- Endpoint constants (identity URL, API base, scope) sit at the top of `resolve_balances.py` and
-  are overridable via `FILEVINE_IDENTITY_URL` / `FILEVINE_API_BASE` / `FILEVINE_SCOPE` if your
-  Filevine region differs.
+- Credentials live only in the environment variables, never in the repo or the docket JSON.
+  (Cloud environments have no dedicated secrets vault — the values are readable by anyone who
+  uses the environment, so keep the PAT rotatable and don't share sessions that used it.)
+- Endpoint defaults are `identity.filevine.com` (token) and `api.filevine.io/fv-app/v2` (API),
+  overridable via `FILEVINE_IDENTITY_URL` / `FILEVINE_API_BASE` / `FILEVINE_SCOPE` if your
+  Filevine region/tenant differs. The first live run confirms them.

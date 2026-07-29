@@ -61,7 +61,7 @@ import urllib.parse
 import urllib.request
 from datetime import datetime
 
-IDENTITY_URL = os.environ.get("FILEVINE_IDENTITY_URL", "https://identity.filevine.io/connect/token")
+IDENTITY_URL = os.environ.get("FILEVINE_IDENTITY_URL", "https://identity.filevine.com/connect/token")
 API_BASE = os.environ.get("FILEVINE_API_BASE", "https://api.filevine.io/fv-app/v2").rstrip("/")
 SCOPE = os.environ.get("FILEVINE_SCOPE", "fv.api.gateway.access tenant")
 
