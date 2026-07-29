@@ -41,9 +41,13 @@ DUI / traffic / license** matters. Payments are logged into Filevine (see the
 collection). Either route below fills `fee_total`, `amount_paid`, `balance`, and
 `last_payment_date`.
 
-### Route A — Zapier Filevine actions (DEFAULT for this firm — no new credentials)
+> **This firm is configured for Route B (Filevine API).** Jim has minted a Client ID + Client
+> Secret + PAT, so balances resolve through `scripts/resolve_balances.py`. Route A (Zapier)
+> stays documented as the no-credential alternative.
 
-**Use this route.** It reuses the firm's **existing Filevine↔Zapier connection** (the
+### Route A — Zapier Filevine actions (no-credential alternative)
+
+Reuses the firm's **existing Filevine↔Zapier connection** (the
 `zapier@filevine-cpi-service-accounts` account already used by `lawpay-filevine-payment-sync`),
 so there is nothing new to create on the Filevine side — no PAT, no Client ID/Secret, no
 org/user id. For how Jim actually uses this skill (asking Claude interactively), the one
@@ -71,12 +75,20 @@ skill-execution time (a plain script can't call MCP):
 Once the exact action + field keys are confirmed on the first live run, record them here so
 future runs skip the discovery step.
 
-### Route B — Filevine API v2 script (for unattended automation): `scripts/resolve_balances.py`
+### Route B — Filevine API v2 script (the firm's configured route): `scripts/resolve_balances.py`
 
-Only needed if this ever runs **fully headless on a schedule** with nobody to approve the MCP
-prompt. It's a self-contained script (no middleman, deterministic, `--selftest`) but requires
-minting Filevine API credentials — see `references/filevine-setup.md`. Not required for the
-default interactive workflow above.
+Self-contained, deterministic, no middleman, offline-testable (`--selftest`). Reads Filevine
+with the firm's API credentials from the environment and looks matters up by
+`filevine_project_id`. Setup and the credential list are in `references/filevine-setup.md`:
+
+```bash
+python scripts/resolve_balances.py --in DOCKET.json --out DOCKET.json
+```
+
+Needs these env secrets: `FILEVINE_PAT`, `FILEVINE_CLIENT_ID`, `FILEVINE_CLIENT_SECRET`,
+`FILEVINE_ORG_ID`, `FILEVINE_USER_ID`, plus `FV_FEE_SELECTOR` / `FV_PAYMENTS_COLLECTION`
+(`--whoami` fetches the two IDs; `--discover` finds the two selectors). If a run reports HTTP
+401/403 the PAT has expired — regenerate it and update `FILEVINE_PAT`.
 
 ### Either way
 
