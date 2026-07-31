@@ -28,18 +28,25 @@ In Filevine → **Reports / Report Builder** → **New Report**:
    pull is needed. (If multiple attorneys, also filter Attendee = Jim Fabbrini.)
 4. **Save** the report. Note its **Report ID** (in the report's URL or its settings/detail).
 
-## Part 2 — Get the Reports API "run report" endpoint
+## ⚠️ Diagnose the Google sync before building this
 
-The appointments endpoint is known (`GET /fv-app/v2/projects/{projectId}/appointments`), but the
-**run-a-saved-report** endpoint isn't confirmed here. On **developer.filevine.io** (logged in),
-open the **Reports** section, or ask Filevine support this exact question:
+Court dates are entered days-to-weeks ahead, so a hearing 3 days out should already be in the
+Filevine→Google sync — **8–24h ICS lag can't explain a totally empty upcoming day.** If the
+Google "Filevine" calendar is empty for a day that has events, the likely cause is a **broken /
+unsubscribed sync or the wrong calendar being read**, not lag — and re-establishing that sync (or
+a real-time Filevine→Google Zap) is far less machinery than the Reports API below. Rule that out
+first. Only build the report if the sync genuinely can't be made reliable.
 
-> "What is the Filevine v2 API endpoint to run a saved report by its report ID and retrieve the
-> result rows? Is it synchronous, or do I create a report run and then fetch results? Please give
-> the full path(s) and any required parameters."
+## Part 2 — Get the Reports API "run report" endpoint (heavy — last resort)
 
-Filevine Reports APIs are often two-step (create a run → poll for results). Capture whatever they
-give: the path(s), method(s), and how rows come back.
+Reality check from a live look: Report endpoints sit under `/reports/*` in a **low-capacity
+bucket rate-limited to ~5 requests/minute**, and the run-report operation is an **async
+create-run → poll → fetch-results flow**, not a single call. The exact paths are only in the
+login-gated interactive docs (Stoplight/JS). To pin them: open **developer.filevine.io →
+Reports** (or the Stoplight mirror), or **export the OpenAPI JSON** (Export → Original) and read
+the Reports operations. The saved **Report ID** is the integer in the UI URL (`…/#/reports/<id>`).
+Given the async + rate-limit cost, prefer fixing the sync above unless a firm-wide real-time pull
+is truly required.
 
 ## Part 3 — Send back to finish wiring
 
