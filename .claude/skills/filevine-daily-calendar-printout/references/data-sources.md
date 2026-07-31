@@ -41,11 +41,12 @@ DUI / traffic / license** matters. Payments are logged into Filevine (see the
 collection). Either route below fills `fee_total`, `amount_paid`, `balance`, and
 `last_payment_date`.
 
-> **This firm is configured for Route B (Filevine API).** Jim has minted a Client ID + Client
-> Secret + PAT, so balances resolve through `scripts/resolve_balances.py`. Route A (Zapier)
-> stays documented as the no-credential alternative.
+> **This firm is configured for Route A (Zapier).** Balances resolve through the existing
+> Filevine↔Zapier connection — no Filevine API keys, no environment secrets, no network
+> allowlist. Route B (the Filevine API script) stays documented for a possible future
+> fully-unattended scheduled run, but is not used by the normal interactive workflow.
 
-### Route A — Zapier Filevine actions (no-credential alternative)
+### Route A — Zapier Filevine actions (the firm's configured route — no credentials)
 
 Reuses the firm's **existing Filevine↔Zapier connection** (the
 `zapier@filevine-cpi-service-accounts` account already used by `lawpay-filevine-payment-sync`),
@@ -75,11 +76,14 @@ skill-execution time (a plain script can't call MCP):
 Once the exact action + field keys are confirmed on the first live run, record them here so
 future runs skip the discovery step.
 
-### Route B — Filevine API v2 script (the firm's configured route): `scripts/resolve_balances.py`
+### Route B — Filevine API v2 script (alternative, for unattended runs): `scripts/resolve_balances.py`
 
-Self-contained, deterministic, no middleman, offline-testable (`--selftest`). Reads Filevine
-with the firm's API credentials from the environment and looks matters up by
-`filevine_project_id`. Setup and the credential list are in `references/filevine-setup.md`:
+Self-contained, deterministic, no middleman, offline-testable (`--selftest`). Only worth the
+setup cost if this ever runs fully headless on a schedule with nobody to approve the Zapier
+prompt — it requires Filevine API credentials plus a network allowlist (see
+`references/filevine-setup.md`). Not needed for the interactive Zapier workflow above. Reads
+Filevine with the firm's API credentials from the environment and looks matters up by
+`filevine_project_id`:
 
 ```bash
 python scripts/resolve_balances.py --in DOCKET.json --out DOCKET.json
