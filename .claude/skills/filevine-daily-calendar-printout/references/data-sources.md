@@ -34,11 +34,25 @@ present an empty docket as authoritative. Remedies, in order:
    docket from that. Still resolve balances and the room/courthouse stacking through Zapier/
    Filevine. A correct printout from user-stated events beats waiting on a laggy sync.
 3. Trigger/await the next Filevine→Google sync and re-pull.
-4. **Bypass the sync: pull court dates straight from Filevine via Zapier** — the same connection
-   used for balances (§2). A live check found **no dedicated calendar/hearing/deadline query
-   action**, but the **`Make API GET Request`** action can hit Filevine's calendar endpoints
-   (hearings/deadlines) — confirm the exact endpoint for the org first, don't guess. The
-   long-term fix if the sync lags often.
+4. **Pull court dates from Filevine directly via Zapier's `Make API GET Request`** (same
+   connection as §2 — no credentials). Confirmed Filevine v2 endpoints:
+   - **Per matter (calendar events = "appointments"):**
+     `GET /fv-app/v2/projects/{projectId}/appointments`
+     (base `https://api.filevine.io` US, or the org gateway `https://api.filevineapp.com`;
+     each appointment has `startUtc`, `endUtc`, `title`, `calendarEventType`, `attendees`,
+     `projectId`). Supports `offset` / `limit` / `requestedFields`; filter by date
+     client-side. Inspect the `Make API GET Request` action first to see whether it wants a
+     full URL or just the path, then pass this path.
+   - **⚠️ There is NO org-wide "all appointments" endpoint** — the list is per-project. So
+     "everything on Monday" the API way means: list projects (`GET .../projects`, paginated)
+     → call appointments for each → merge/filter by date. That's impractical at firm scale
+     (hundreds of projects = hundreds of calls). Use per-project appointments only to enrich a
+     **known** matter (exact time/room), not to discover the whole day.
+   - **Firm-wide the right way: a Filevine "Calendar Events" report.** Build a saved report in
+     Filevine Report Builder (Calendar Events report type, filtered to the date range /
+     upcoming; columns: project, event date, type, location, attendees), then run it through
+     the Reports API via `Make API GET Request`. This is the real hands-free source for the
+     full daily docket without the sync lag. One-time report setup required.
 
 If neither the Google Calendar connector nor Zapier is connected, say so and ask the user to
 connect one (or provide the day's events another way) — never fabricate a docket. If the firm's
