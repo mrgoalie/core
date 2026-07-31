@@ -26,9 +26,11 @@ expected matter is absent, say so plainly — don't present an empty docket as a
 Two remedies:
 1. Trigger/await the next Filevine→Google sync and re-pull.
 2. **Bypass the sync entirely: pull court dates straight from Filevine via Zapier** — the same
-   connection used for balances (§2). If a Filevine calendar/deadline **search** action is
-   available (`discover_zapier_actions({ app: "Filevine" })`), read the day's items directly.
-   This is the most current source and the right long-term fix if the sync lags often.
+   connection used for balances (§2). A live check found **no dedicated calendar/hearing/
+   deadline query action** on this connection, but the **`Make API GET Request`** action can hit
+   Filevine's calendar endpoints directly (e.g. hearings/deadlines) — confirm the exact endpoint
+   for the org before relying on it, rather than guessing. This is the most current source and
+   the right long-term fix if the sync lags often; otherwise trigger a manual sync (remedy 1).
 
 If neither the Google Calendar connector nor Zapier is connected, say so and ask the user to
 connect one (or provide the day's events another way) — never fabricate a docket. If the firm's
@@ -69,13 +71,18 @@ skill-execution time (a plain script can't call MCP):
    instructions first — `get_zapier_skill("log lawpay payment to filevine")` — to read the exact
    **project/collection/section identifiers and the amount + date field keys** it uses. Reading
    balances is the mirror image of that write, against the same collection.
-2. `discover_zapier_actions({ app: "Filevine" })` → the Filevine app (`FilevineCLIAPI`;
-   1 read / 9 search / 10 write actions).
-3. `inspect_zapier_actions({ selected_api: "FilevineCLIAPI" })` → choose the action that reads a
-   project's fee and its payment collection. Prefer a Filevine **"API Request"** action if one is
-   enabled (it can GET `core/projects/{id}` and `.../Collections/{payments}` directly through the
-   Zapier connection); otherwise use **"Find Project"** + a collection-item **search** action.
-   `enable_zapier_action` it if needed, then resolve the parameter schema.
+2. `discover_zapier_actions({ app: "Filevine" })` → the Filevine app (`FilevineCLIAPI`).
+3. **Confirmed available actions on this firm's connection** (from a live check): `Find Project`,
+   `Find Collection Item`, `Find Form` / `Find Form by Selector`, `Find Contact`, `Find User`,
+   `Find Phase`, and two raw actions **`Make API GET Request`** / `Make Mutating API Request`.
+   There is **no** dedicated calendar/hearing/deadline query action. For balances:
+   - Preferred: **`Find Collection Item`** against the payment collection named in step 1
+     (it's a generic collection search — you supply the collection name/mode), plus
+     **`Find Project`** for the fee field.
+   - Flexible fallback: **`Make API GET Request`** to hit `core/projects/{id}` and
+     `core/projects/{id}/Collections/{payments}` directly through the Zapier connection.
+   Resolve the chosen action's schema with `inspect_zapier_actions({ tool_name })`;
+   `enable_zapier_action` it if it isn't active.
 4. Look the matter up by **`filevine_project_id`** (the `r/p/NNNNNNN` ref captured in the
    calendar pull) — no fuzzy name matching.
 5. `execute_zapier_read_action(...)` → pull the flat fee, the payment rows, and the latest
