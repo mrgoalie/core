@@ -55,16 +55,19 @@ Default to **today** in America/Chicago. Honor an explicit day ("tomorrow," "Thu
 ### 2. Pull the calendar
 Read `references/data-sources.md` first — it has the exact connector calls. In brief:
 
-- **Operational pull:** the target day's events from the **Filevine Sync + M365 calendar**
-  via the Microsoft 365 connector (`outlook_calendar_search` / `read_resource`). Capture the
-  event **body/notes** and any **Zoom dial-in** — put the note text in `notes` (verbatim) and
-  the dial-in in `zoom`. Zoom info often lives inside the location/room string or the body, so
-  read both.
-- **Forward pull (today → +120 days), courthouse + room only:** this is what powers
-  *↻ Next in room* and *⌂ Next at courthouse*. 120 days, not 30 — continuance and
-  trial-setting targets routinely land 6–16 weeks out (RS-9 in the command-brief ruleset).
-- Skip events titled **CANCELLED / STRICKEN** (note a reschedule if the description names a
-  new date). Screen for Illinois court holidays before trusting any date.
+- **Source: the firm's Filevine calendar, which syncs into Google Calendar.** Use the Google
+  Calendar connector (`mcp__Google_Calendar__*`): `list_calendars` → find the Filevine-synced
+  calendar → read events from *that* calendar id. Capture each event's **description/notes** and
+  any **Zoom dial-in** — put the note text in `notes` (verbatim) and the dial-in in `zoom`
+  (it often hides in the location string or the description, so read both).
+- **Forward pull (today → +120 days), courthouse + room only:** powers *↻ Next in room* and
+  *⌂ Next at courthouse*. 120 days, not 30 — continuance/trial-setting targets routinely land
+  6–16 weeks out (RS-9 in the command-brief ruleset).
+- **Sync lag:** the Google feed mirrors Filevine on a delay, so a just-entered date can be
+  missing. If the day looks empty or a matter is absent, say so — don't present an empty docket
+  as truth. The most current source is pulling court dates straight from Filevine via Zapier;
+  see `references/data-sources.md` → "Calendar." Skip **CANCELLED / STRICKEN** events; screen
+  for Illinois court holidays before trusting any date.
 
 ### 3. Classify each event
 Read `references/firm-rules.md` (courthouse codes, appearance types, in-person vs. Zoom,

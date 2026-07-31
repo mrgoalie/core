@@ -2,29 +2,38 @@
 
 ## 1. Calendar (the docket + the stacking window)
 
-The firm's court dates live on the **Filevine Sync calendar**, surfaced through Outlook, so
-pull them with the **Microsoft 365 connector** — the same source `flg-command-brief` uses.
+**This firm's Filevine calendar syncs into Google Calendar** (a Filevine→Google sync feed), so
+that's the source — use the **Google Calendar connector** (`mcp__Google_Calendar__*`). First
+`list_calendars` to find the Filevine-synced calendar by name (it's usually named "Filevine"
+or similar), then read events from *that* calendar id — not the user's primary.
 
 **Operational pull — the target day's events (full detail):**
-- `mcp__Microsoft_365__outlook_calendar_search` scoped to the target date (America/Chicago).
-- If the connector exposes the calendar as a resource, `mcp__Microsoft_365__read_resource`
-  works too. Capture for each event: start time, subject/title, location (courthouse + room),
-  and **the full body/notes**.
-  - **`notes`** ← the event body text, verbatim (the offer, CW status, transport instruction,
-    etc. usually live here). Don't summarize it away.
-  - **`zoom`** ← any dial-in in the body *or* the location/room string (meeting ID + passcode,
+- `mcp__Google_Calendar__list_events` (or `search_events`) on the Filevine calendar id, scoped
+  to the target date (America/Chicago). Capture for each event: start time, summary/title,
+  location (courthouse + room), and **the full description/notes**.
+  - **`notes`** ← the event description text, verbatim (the offer, CW status, transport
+    instruction, etc. usually live here). Don't summarize it away.
+  - **`zoom`** ← any dial-in in the description *or* the location string (meeting ID + passcode,
     or a `zoom.us/j/...` link). Suppress it only for hard-in-person rooms (see `firm-rules.md`).
 
 **Forward pull — today → +120 days, courthouse + room only:**
-- Same tool, wider window. You don't need full bodies here — just enough to know, for every
-  future event, its date, time, courthouse, and room. This feeds `next_in_room` and
-  `next_at_courthouse`. Do the 120 days in one search if the connector allows a range;
-  otherwise page through it.
+- Same calendar, wider window. You don't need full descriptions here — just each future event's
+  date, time, courthouse, and room. This feeds `next_in_room` and `next_at_courthouse`.
 
-If the Microsoft 365 connector isn't connected, say so and ask the user to connect it (or
-provide the day's events another way) — don't fabricate a docket. Google Calendar
-(`mcp__Google_Calendar__*`) is an acceptable substitute **only** if that's where the user's
-court dates actually live; confirm before relying on it.
+**Sync-lag caveat (important).** The Google feed is a *sync* of Filevine, not Filevine itself,
+so a freshly-entered court date can be missing for a sync cycle. If the day looks empty or an
+expected matter is absent, say so plainly — don't present an empty docket as authoritative.
+Two remedies:
+1. Trigger/await the next Filevine→Google sync and re-pull.
+2. **Bypass the sync entirely: pull court dates straight from Filevine via Zapier** — the same
+   connection used for balances (§2). If a Filevine calendar/deadline **search** action is
+   available (`discover_zapier_actions({ app: "Filevine" })`), read the day's items directly.
+   This is the most current source and the right long-term fix if the sync lags often.
+
+If neither the Google Calendar connector nor Zapier is connected, say so and ask the user to
+connect one (or provide the day's events another way) — never fabricate a docket. If the firm's
+setup ever moves the Filevine calendar to Outlook, the Microsoft 365 connector
+(`mcp__Microsoft_365__outlook_calendar_search`) is the equivalent pull — confirm before using.
 
 ### Parsing courthouse + room out of an event
 
