@@ -2,69 +2,35 @@
 
 ## 1. Calendar (the docket + the stacking window)
 
-**Configured firm-wide source: a Filevine "Calendar Events" report** run through Zapier — see
-`references/calendar-events-report.md`. Filevine's appointments API is per-project (no org-wide
-"today" call) and the Google sync lags, so a saved report is the real hands-free source: one
-120-day run returns every matter's court dates in real time, no credentials. Once the report is
-built (its Report ID + run endpoint recorded in that file), use it as the primary pull and skip
-to the column→field mapping there. Until then, or as a fallback, use the Google sync below.
-
-**Google Calendar (fallback / until the report is wired):** this firm's Filevine calendar also
-syncs into Google Calendar, so use the **Google Calendar connector** (`mcp__Google_Calendar__*`):
-`list_calendars` to find the Filevine-synced calendar by name (usually "Filevine" or similar),
-then read events from *that* calendar id — not the user's primary.
+**Source: the Filevine Sync calendar in Microsoft 365 / Outlook.** This is where the firm's
+court dates actually live — it's the same calendar the `flg-command-brief` (Executive Summary)
+skill reads, and it is reliably full. Use the **Microsoft 365 connector**
+(`mcp__Microsoft_365__outlook_calendar_search` / `read_resource`). Do **not** use Google
+Calendar — the firm's Google "Filevine" calendar is empty; that was a wrong turn.
 
 **Operational pull — the target day's events (full detail):**
-- `mcp__Google_Calendar__list_events` (or `search_events`) on the Filevine calendar id, scoped
-  to the target date (America/Chicago). Capture for each event: start time, summary/title,
-  location (courthouse + room), and **the full description/notes**.
-  - **`notes`** ← the event description text, verbatim (the offer, CW status, transport
-    instruction, etc. usually live here). Don't summarize it away.
-  - **`zoom`** ← any dial-in in the description *or* the location string (meeting ID + passcode,
-    or a `zoom.us/j/...` link). Suppress it only for hard-in-person rooms (see `firm-rules.md`).
+- `mcp__Microsoft_365__outlook_calendar_search` scoped to the target date (America/Chicago) on
+  the Filevine Sync calendar. Capture for each event: start time, subject/title, location
+  (courthouse + room), and **the full body/notes**.
+  - **`notes`** ← the event body text, verbatim (the offer, CW status, transport instruction,
+    etc. usually live here). Don't summarize it away.
+  - **`zoom`** ← any dial-in in the body *or* the location string (meeting ID + passcode, or a
+    `zoom.us/j/...` link). Suppress it only for hard-in-person rooms (see `firm-rules.md`).
 
 **Forward pull — today → +120 days, courthouse + room only:**
-- Same calendar, wider window. You don't need full descriptions here — just each future event's
-  date, time, courthouse, and room. This feeds `next_in_room` and `next_at_courthouse`.
+- Same calendar, wider window. Just each future event's date, time, courthouse, and room —
+  this feeds `next_in_room` and `next_at_courthouse`.
 
-**Sync-lag caveat (important).** The Google feed is a *sync* of Filevine, not Filevine itself,
-so a freshly-entered court date can be missing for a sync cycle. **If the Filevine calendar is a
-subscribed ICS feed in Google, Google refreshes it on its own slow schedule (often 8–24h), not
-in real time** — so a hearing entered this week may not appear for the coming Monday even though
-it's in Filevine. If the day looks empty or an expected matter is absent, say so plainly — don't
-present an empty docket as authoritative. Remedies, in order:
+If the Microsoft 365 connector isn't connected, say so and ask the user to connect it — never
+fabricate a docket. If a specific day genuinely has no events, say so plainly rather than
+presenting an empty docket as a failure.
 
-1. **Confirm it's not just a genuinely light day** — ask the user (or check Filevine directly)
-   whether court is actually set that day before assuming the pull failed.
-2. **Manual fallback (fastest path to a real printout):** if the user knows the day's
-   matter(s), have them name each one (time, courthouse, room, matter #/client) and build the
-   docket from that. Still resolve balances and the room/courthouse stacking through Zapier/
-   Filevine. A correct printout from user-stated events beats waiting on a laggy sync.
-3. Trigger/await the next Filevine→Google sync and re-pull.
-4. **Pull court dates from Filevine directly via Zapier's `Make API GET Request`** (same
-   connection as §2 — no credentials). Confirmed Filevine v2 endpoints:
-   - **Per matter (calendar events = "appointments"):**
-     `GET /fv-app/v2/projects/{projectId}/appointments`
-     (base `https://api.filevine.io` US, or the org gateway `https://api.filevineapp.com`;
-     each appointment has `startUtc`, `endUtc`, `title`, `calendarEventType`, `attendees`,
-     `projectId`). Supports `offset` / `limit` / `requestedFields`; filter by date
-     client-side. Inspect the `Make API GET Request` action first to see whether it wants a
-     full URL or just the path, then pass this path.
-   - **⚠️ There is NO org-wide "all appointments" endpoint** — the list is per-project. So
-     "everything on Monday" the API way means: list projects (`GET .../projects`, paginated)
-     → call appointments for each → merge/filter by date. That's impractical at firm scale
-     (hundreds of projects = hundreds of calls). Use per-project appointments only to enrich a
-     **known** matter (exact time/room), not to discover the whole day.
-   - **Firm-wide the right way: a Filevine "Calendar Events" report.** Build a saved report in
-     Filevine Report Builder (Calendar Events report type, filtered to the date range /
-     upcoming; columns: project, event date, type, location, attendees), then run it through
-     the Reports API via `Make API GET Request`. This is the real hands-free source for the
-     full daily docket without the sync lag. One-time report setup required.
-
-If neither the Google Calendar connector nor Zapier is connected, say so and ask the user to
-connect one (or provide the day's events another way) — never fabricate a docket. If the firm's
-setup ever moves the Filevine calendar to Outlook, the Microsoft 365 connector
-(`mcp__Microsoft_365__outlook_calendar_search`) is the equivalent pull — confirm before using.
+> **Deep fallbacks (only if M365 is ever unavailable), in order:** (a) the user names the day's
+> matters and you build from that; (b) per-matter Filevine appointments via Zapier —
+> `GET /fv-app/v2/projects/{projectId}/appointments` through `Make API GET Request` — to enrich
+> a known matter; (c) a firm-wide Filevine "Calendar Events" report
+> (`references/calendar-events-report.md`), which is heavy (async, ~5 req/min) and a genuine
+> last resort. None of these are needed while M365 works.
 
 ### Parsing courthouse + room out of an event
 
