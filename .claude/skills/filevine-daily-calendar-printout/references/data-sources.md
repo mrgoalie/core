@@ -21,16 +21,24 @@ or similar), then read events from *that* calendar id — not the user's primary
   date, time, courthouse, and room. This feeds `next_in_room` and `next_at_courthouse`.
 
 **Sync-lag caveat (important).** The Google feed is a *sync* of Filevine, not Filevine itself,
-so a freshly-entered court date can be missing for a sync cycle. If the day looks empty or an
-expected matter is absent, say so plainly — don't present an empty docket as authoritative.
-Two remedies:
-1. Trigger/await the next Filevine→Google sync and re-pull.
-2. **Bypass the sync entirely: pull court dates straight from Filevine via Zapier** — the same
-   connection used for balances (§2). A live check found **no dedicated calendar/hearing/
-   deadline query action** on this connection, but the **`Make API GET Request`** action can hit
-   Filevine's calendar endpoints directly (e.g. hearings/deadlines) — confirm the exact endpoint
-   for the org before relying on it, rather than guessing. This is the most current source and
-   the right long-term fix if the sync lags often; otherwise trigger a manual sync (remedy 1).
+so a freshly-entered court date can be missing for a sync cycle. **If the Filevine calendar is a
+subscribed ICS feed in Google, Google refreshes it on its own slow schedule (often 8–24h), not
+in real time** — so a hearing entered this week may not appear for the coming Monday even though
+it's in Filevine. If the day looks empty or an expected matter is absent, say so plainly — don't
+present an empty docket as authoritative. Remedies, in order:
+
+1. **Confirm it's not just a genuinely light day** — ask the user (or check Filevine directly)
+   whether court is actually set that day before assuming the pull failed.
+2. **Manual fallback (fastest path to a real printout):** if the user knows the day's
+   matter(s), have them name each one (time, courthouse, room, matter #/client) and build the
+   docket from that. Still resolve balances and the room/courthouse stacking through Zapier/
+   Filevine. A correct printout from user-stated events beats waiting on a laggy sync.
+3. Trigger/await the next Filevine→Google sync and re-pull.
+4. **Bypass the sync: pull court dates straight from Filevine via Zapier** — the same connection
+   used for balances (§2). A live check found **no dedicated calendar/hearing/deadline query
+   action**, but the **`Make API GET Request`** action can hit Filevine's calendar endpoints
+   (hearings/deadlines) — confirm the exact endpoint for the org first, don't guess. The
+   long-term fix if the sync lags often.
 
 If neither the Google Calendar connector nor Zapier is connected, say so and ask the user to
 connect one (or provide the day's events another way) — never fabricate a docket. If the firm's
