@@ -2,10 +2,17 @@
 
 ## 1. Calendar (the docket + the stacking window)
 
-**This firm's Filevine calendar syncs into Google Calendar** (a Filevine→Google sync feed), so
-that's the source — use the **Google Calendar connector** (`mcp__Google_Calendar__*`). First
-`list_calendars` to find the Filevine-synced calendar by name (it's usually named "Filevine"
-or similar), then read events from *that* calendar id — not the user's primary.
+**Configured firm-wide source: a Filevine "Calendar Events" report** run through Zapier — see
+`references/calendar-events-report.md`. Filevine's appointments API is per-project (no org-wide
+"today" call) and the Google sync lags, so a saved report is the real hands-free source: one
+120-day run returns every matter's court dates in real time, no credentials. Once the report is
+built (its Report ID + run endpoint recorded in that file), use it as the primary pull and skip
+to the column→field mapping there. Until then, or as a fallback, use the Google sync below.
+
+**Google Calendar (fallback / until the report is wired):** this firm's Filevine calendar also
+syncs into Google Calendar, so use the **Google Calendar connector** (`mcp__Google_Calendar__*`):
+`list_calendars` to find the Filevine-synced calendar by name (usually "Filevine" or similar),
+then read events from *that* calendar id — not the user's primary.
 
 **Operational pull — the target day's events (full detail):**
 - `mcp__Google_Calendar__list_events` (or `search_events`) on the Filevine calendar id, scoped

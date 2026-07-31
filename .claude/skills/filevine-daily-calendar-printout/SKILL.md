@@ -181,6 +181,9 @@ unresolved" is trustworthy; one that prints a made-up number is dangerous at a p
 
 ## Reference files
 
+- `references/calendar-events-report.md` — the configured firm-wide calendar source: how to
+  build the Filevine "Calendar Events" report and run it through Zapier (no sync lag, no
+  credentials), with the column→docket-field mapping and the fallback order.
 - `references/firm-rules.md` — courthouse codes, appearance types, in-person/Zoom rules,
   case-type detection, and the room/courthouse stacking definitions. Defers to
   `flg-command-brief` RS-12 as the source of truth.
