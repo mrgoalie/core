@@ -1,0 +1,23 @@
+{
+  "skill_name": "filevine-daily-calendar-printout",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Make me the fold-in-half court sheet for today that I can print and take to court.",
+      "expected_output": "A print-ready 8.5x11 PDF whose readable content sits in a 4.25\" column (fold-in-half-lengthwise layout), one card per court event with the next date/time in that room, the next date/time at that courthouse, a balance line only on criminal/DUI/traffic/license matters, and ruled note lines under each event.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Print my calendar for Thursday. I want to see how much each DUI/traffic client still owes and when I'm next back in each courtroom.",
+      "expected_output": "Same printout for the specified day. Flat-fee matters (criminal/DUI/traffic/license) show a balance owed (or 'unresolved' if Filevine can't be reached); PI matters show no balance. Each event shows next-in-room and next-at-courthouse from a 120-day forward window.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "I've got the docket in this JSON already — just render the folded daily court calendar PDF from it.",
+      "expected_output": "Runs scripts/build_calendar_pdf.py on the provided JSON without re-pulling the calendar, producing the PDF + HTML in the correct fold layout.",
+      "files": ["assets/sample-events.json"]
+    }
+  ]
+}
