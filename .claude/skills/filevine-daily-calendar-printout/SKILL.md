@@ -68,6 +68,24 @@ Read `references/data-sources.md` first — it has the exact connector calls. In
   for Illinois court holidays before trusting any date. If M365 isn't connected, say so; if a day
   genuinely has no events, say so — don't present an empty docket as a failure.
 
+### 2b. Resolve the matter label — `#nnnn Client Name` (REQUIRED)
+The court-call events are titled by courthouse + appearance type (e.g. "M6 - SC DISC"); the
+**client name is NOT in the calendar event** — the body holds only a Filevine deep link
+`https://…filev.io/r/ca/<id>` (a calendar-item id) plus Jim's notes. So every matter's display
+label must be **resolved from Filevine**, exactly as `flg-command-brief` does it:
+
+1. Pull the `r/ca/<id>` (or `r/p/<id>`) from each event body.
+2. Resolve it to the **project** via the firm's Filevine access (see `references/data-sources.md`
+   → "Matter identity"): appointment/calendar-item lookup → `projectId` → project, then read the
+   **client name** and the firm's **internal matter #**.
+3. Display as **`#nnnn Client Name`** (e.g. `#6034 Chowdhury, Tabassum`). Never show the raw
+   `ca/`/`p/` id as the label. If a name can't be resolved, keep the event but put the gap in
+   `data_gaps` — never invent a client name.
+
+Use the **direct Filevine API** for this (and for balances in step 5) — it's the same access
+`flg-command-brief` uses and it does **not** consume Zapier tasks. (Zapier's Filevine actions are
+a fallback but are subject to the account's task quota, which can be exhausted.)
+
 ### 3. Classify each event
 Read `references/firm-rules.md` (courthouse codes, appearance types, in-person vs. Zoom,
 case-type detection). That file defers to `flg-command-brief`'s ruleset **RS-12** as the
@@ -83,15 +101,14 @@ For each event, from the 120-day forward pull:
   window" and suppresses the ★ same-room star. A stated empty is fine; a silent omission is not.
 
 ### 5. Resolve the balance (flat-fee case types only)
-For **criminal / DUI / traffic / license** matters, resolve what's still owed from Filevine.
-**This firm is configured for the Zapier route** — it reuses the existing Filevine↔Zapier
-connection (the one `lawpay-filevine-payment-sync` already runs on), so there are no Filevine
-API keys, no environment secrets, and no network allowlist to manage. At skill-execution time,
-read each flat-fee matter's fee + payments through the Zapier Filevine actions and fill
-`fee_total`, `amount_paid`, `balance`, and `last_payment_date`. Look matters up by
-`filevine_project_id` (the `r/p/NNNNNNN` ref grabbed from the event's Filevine deep link during
-the calendar pull). The full procedure — including reusing the LawPay-sync skill's Zapier
-instructions to get the exact payment collection/field keys — is in `references/data-sources.md`
+For **criminal / DUI / traffic / license** matters, resolve what's still owed from Filevine
+using the **same direct Filevine API access** as step 2b (the access `flg-command-brief` uses;
+it doesn't burn Zapier tasks). Fill `fee_total`, `amount_paid`, `balance`, and
+`last_payment_date` for the project resolved in step 2b. When a calendar note already states the
+money (e.g. "$800 left"), use it and confirm against Filevine. Zapier's Filevine actions are a
+fallback only — the account's task quota can be exhausted ("insufficient tasks on account"), in
+which case say so rather than silently dropping balances. The full procedure is in
+`references/data-sources.md`
 → "Balance lookup, Route A."
 
 `scripts/resolve_balances.py` (Route B) is the Filevine-API alternative, kept only for a
