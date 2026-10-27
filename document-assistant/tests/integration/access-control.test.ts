@@ -13,6 +13,7 @@ import { GET as homeGET } from "@/app/api/home/route";
 import { GET as employeesGET } from "@/app/api/admin/employees/route";
 import { POST as workPOST } from "@/app/api/work/route";
 import { GET as workGET } from "@/app/api/work/[id]/route";
+import { GET as clioConnectGET } from "@/app/api/clio/connect/route";
 import { actor, DEMO, freshDb, runJobs, skillId } from "../helpers";
 
 let db: DB;
@@ -51,6 +52,17 @@ describe("HTTP authorization boundaries (route handlers)", () => {
     expect((await workPOST(req("/api/work", token, { method: "POST", body, origin: "https://evil.example" }), noParams)).status).toBe(403);
     expect((await workPOST(req("/api/work", token, { method: "POST", body }), noParams)).status).toBe(403);
     expect((await workPOST(req("/api/work", token, { method: "POST", body, origin: "http://localhost:3000" }), noParams)).status).toBe(200);
+  });
+
+  it("rate-limits repeated requests from one person", async () => {
+    const token = await login(DEMO.daniel);
+    const statuses: number[] = [];
+    // The Clio connection route allows 20 requests a minute (it answers "not found" in demonstration mode).
+    for (let i = 0; i < 21; i++) statuses.push((await clioConnectGET(req("/api/clio/connect", token), noParams)).status);
+    expect(statuses.slice(0, 20).every((s) => s === 404)).toBe(true);
+    expect(statuses[20]).toBe(429);
+    // Other people are not affected.
+    expect((await clioConnectGET(req("/api/clio/connect", await login(DEMO.maria)), noParams)).status).toBe(404);
   });
 
   it("does not reveal another employee's work", async () => {

@@ -238,6 +238,13 @@ function StepCase({ view, reload, next }: { view: View; reload: () => Promise<Vi
         </div>
       ) : null}
       <ErrorAlert error={err} />
+      {err?.code === "clio_not_connected" ? (
+        <p style={{ marginTop: 12 }}>
+          <a className="btn" href={`/api/clio/connect?returnTo=${encodeURIComponent(`/work/${sid}`)}`}>
+            Connect Clio
+          </a>
+        </p>
+      ) : null}
       <div className="step-actions">
         <span />
         <Button size="lg" onClick={cont} disabled={!picked} busy={busy}>

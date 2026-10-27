@@ -6,6 +6,8 @@ import { textPagesToPdf } from "@/server/documents/pdf-compose";
 import { setAiProviderForTesting } from "@/server/integrations/ai/service";
 import { AiError, type AiProvider } from "@/server/integrations/ai/types";
 import { recoverStaleJobs } from "@/server/jobs/queue";
+import { updateSystemSettings } from "@/server/services/admin";
+import { getSetting } from "@/server/settings";
 import { getWorkView, requestAnalysis, requestGeneration, saveAnswers, saveSectionEdits, selectMatter, startWork, submitForReview, uploadDocument, requestRerender } from "@/server/services/work";
 import { actor, DEMO, freshDb, runJobs, skillId } from "../helpers";
 
@@ -149,5 +151,35 @@ describe("uploads", () => {
     await expect(uploadDocument(db, maria, sessionId, { name: "invoice.pdf", bytes: bad }, null)).rejects.toThrow(/active content/);
     const rows = await db.select().from(auditLogs).where(eq(auditLogs.action, "upload.rejected"));
     expect(rows.length).toBe(1);
+  });
+});
+
+describe("AI settings", () => {
+  it("changing one setting leaves the others as they were", async () => {
+    const taylor = await actor(db, DEMO.taylor);
+    await updateSystemSettings(db, taylor, { ai: { draftingEffort: "high", maxRunsPerUserPerDay: 10 }, retention: { workingFileDays: 30 } });
+    await updateSystemSettings(db, taylor, { ai: { monthlyBudgetUsd: 500 }, retention: { testRunDays: 3 } });
+    const ai = await getSetting(db, "ai");
+    expect(ai).toMatchObject({ provider: "demo", draftingEffort: "high", maxRunsPerUserPerDay: 10, monthlyBudgetUsd: 500 });
+    expect(await getSetting(db, "retention")).toEqual({ workingFileDays: 30, testRunDays: 3 });
+  });
+
+  it("sends the administrator's effort settings to the provider", async () => {
+    const taylor = await actor(db, DEMO.taylor);
+    await updateSystemSettings(db, taylor, { ai: { extractionEffort: "medium", draftingEffort: "xhigh", maxRunsPerUserPerDay: 1000 } });
+    const seen: Record<string, string> = {};
+    setAiProviderForTesting({
+      id: "anthropic",
+      label: "x",
+      isDemonstration: false,
+      async generate(req) {
+        seen[req.task] = req.effort;
+        throw new AiError("refused", "declined");
+      },
+    });
+    const { maria, sessionId } = await preparedSession();
+    await runJobs(db, (await requestAnalysis(db, maria, sessionId)).jobId);
+    await runJobs(db, (await requestGeneration(db, maria, sessionId)).jobId);
+    expect(seen).toEqual({ extract_document: "medium", draft_sections: "xhigh" });
   });
 });

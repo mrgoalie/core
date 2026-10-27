@@ -54,6 +54,8 @@ const MAX_ATTEMPTS = 2;
 export async function runAiTask<T>(db: DB, req: AiRequest<T>, ctx: RunContext): Promise<{ data: T; provider: AiProvider; model: string }> {
   const provider = await resolveProvider(db);
   const settings = await getSetting(db, "ai");
+  // The administrator's effort settings apply to every skill: reading documents vs. drafting wording.
+  req = { ...req, effort: req.task === "draft_sections" ? settings.draftingEffort : settings.extractionEffort };
 
   if (!provider.isDemonstration && ctx.userId) {
     const since = new Date(Date.now() - 24 * 3600_000);

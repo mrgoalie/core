@@ -178,9 +178,20 @@ const SystemSettingsInput = z.object({
   clio: SETTING_SCHEMAS.clio.unwrap().partial().optional(),
 });
 
+/** Keeps only the fields the caller actually sent: parsing fills in schema defaults, which must not overwrite stored values. */
+function sentFields<T extends Record<string, unknown>>(parsed: Record<string, T | undefined>, raw: unknown) {
+  const out: Record<string, Partial<T>> = {};
+  for (const [section, value] of Object.entries(parsed)) {
+    const sent = (raw as Record<string, Record<string, unknown> | undefined>)[section];
+    if (!value || !sent || typeof sent !== "object") continue;
+    out[section] = Object.fromEntries(Object.entries(value).filter(([k]) => k in sent)) as Partial<T>;
+  }
+  return out;
+}
+
 export async function updateSystemSettings(db: DB, actor: Actor, input: unknown, meta?: RequestMeta) {
   if (!isSystemAdmin(actor)) throw new ForbiddenError("Only a System Administrator can change technical settings.");
-  const patch = SystemSettingsInput.parse(input);
+  const patch = sentFields(SystemSettingsInput.parse(input), input) as z.infer<typeof SystemSettingsInput>;
   if (patch.ai) {
     const current = await getSetting(db, "ai");
     const next = { ...current, ...patch.ai };

@@ -105,6 +105,23 @@ export default function SettingsPage() {
             <input id="ai-m" type="text" disabled={ro} value={a.model} onChange={(e) => setAi({ ...a, model: e.target.value })} />
           </div>
           <div className="field">
+            <label htmlFor="ai-xe">Effort when reading documents</label>
+            <select id="ai-xe" disabled={ro} value={a.extractionEffort} onChange={(e) => setAi({ ...a, extractionEffort: e.target.value })}>
+              <option value="low">Low (fastest, lowest cost)</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="ai-de">Effort when drafting</label>
+            <select id="ai-de" disabled={ro} value={a.draftingEffort} onChange={(e) => setAi({ ...a, draftingEffort: e.target.value })}>
+              <option value="low">Low (fastest, lowest cost)</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="xhigh">Extra high (slowest, highest cost)</option>
+            </select>
+          </div>
+          <div className="field">
             <label htmlFor="ai-lim">Most AI runs per person per day</label>
             <input id="ai-lim" type="number" disabled={ro} value={a.maxRunsPerUserPerDay} onChange={(e) => setAi({ ...a, maxRunsPerUserPerDay: Number(e.target.value) })} />
           </div>
@@ -115,7 +132,7 @@ export default function SettingsPage() {
         </div>
         {!ro ? (
           <div>
-            <Button onClick={() => put({ ai: { provider: a.provider, model: a.model, maxRunsPerUserPerDay: a.maxRunsPerUserPerDay, monthlyBudgetUsd: a.monthlyBudgetUsd } }, "AI settings saved.")}>Save AI settings</Button>
+            <Button onClick={() => put({ ai: { provider: a.provider, model: a.model, extractionEffort: a.extractionEffort, draftingEffort: a.draftingEffort, maxRunsPerUserPerDay: a.maxRunsPerUserPerDay, monthlyBudgetUsd: a.monthlyBudgetUsd } }, "AI settings saved.")}>Save AI settings</Button>
           </div>
         ) : null}
         {data.ai.provider !== "demo" ? (

@@ -18,5 +18,5 @@ export const GET = apiRoute({ rate: { name: "clio-connect", limit: 20 } }, async
   }
   await adapter.exchangeCode(actor.id, code);
   await audit(db, { actor, action: "clio.connected", meta });
-  return NextResponse.redirect(new URL("/?clio=connected", base));
+  return NextResponse.redirect(new URL(row.returnTo || "/", base));
 });
