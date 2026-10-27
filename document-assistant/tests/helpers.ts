@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { loadActor } from "@/server/auth/session";
 import { createDatabase, setDbForTesting, type DB } from "@/server/db/client";
 import { ensureBaseline } from "@/server/db/bootstrap";
-import { skills, users } from "@/server/db/schema";
+import { jobs, skills, users } from "@/server/db/schema";
 import { processAvailableJobs, getJob } from "@/server/jobs/queue";
 import "@/server/jobs/handlers";
 import { EncryptedStorage, MemoryBackend, setStorageForTesting } from "@/server/storage";
@@ -41,7 +41,13 @@ export async function skillId(db: DB, slug: string) {
   return s.id;
 }
 
+/** Runs queued jobs to completion, fast-forwarding retry back-off delays. */
 export async function runJobs(db: DB, jobId?: string) {
-  await processAvailableJobs(db, 50);
+  for (let i = 0; i < 10; i++) {
+    await processAvailableJobs(db, 50);
+    const waiting = await db.select({ id: jobs.id }).from(jobs).where(eq(jobs.status, "queued"));
+    if (!waiting.length) break;
+    await db.update(jobs).set({ runAfter: new Date(0) }).where(eq(jobs.status, "queued"));
+  }
   return jobId ? getJob(db, jobId) : null;
 }

@@ -44,7 +44,7 @@ export default function ActivityPage() {
       {error ? <Alert tone="danger">{error.message}</Alert> : null}
       {!data ? <Spinner /> : (
         <>
-          <div className="table-wrap">
+          <div className="table-wrap" tabIndex={0} role="region" aria-label="Scrollable table">
             <table className="table">
               <caption className="sr-only">Activity log</caption>
               <thead>

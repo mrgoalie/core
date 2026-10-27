@@ -67,8 +67,9 @@ export function AppShell({ user, branding, navigation, reviewCount, demoMode, ge
       ) : null}
       <header className="site-header">
         <div className="inner">
-          <Link href={preview ? "#" : "/"} className="brand" aria-label={`${branding.firmName} ${branding.appName} — home`}>
+          <Link href={preview ? "#" : "/"} className="brand">
             <BrandBlock branding={branding} />
+            <span className="sr-only"> — home</span>
           </Link>
           <nav className="main-nav" aria-label="Main">
             {link("/", navigation.homeLabel, <House size={20} aria-hidden="true" />)}

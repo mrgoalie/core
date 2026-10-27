@@ -19,7 +19,7 @@ type Holder = { db?: DB; ready?: Promise<DB>; close?: () => Promise<void> };
 const g = globalThis as unknown as { __fdaDb?: Holder };
 const holder: Holder = (g.__fdaDb ??= {});
 
-export const MIGRATIONS_DIR = path.resolve(process.cwd(), "drizzle");
+export const MIGRATIONS_DIR = path.resolve(/* turbopackIgnore: true */ process.cwd(), "drizzle");
 
 export async function createDatabase(url: string, opts: { migrate?: boolean } = {}): Promise<{ db: DB; close: () => Promise<void> }> {
   if (url.startsWith("pglite:")) {
@@ -30,7 +30,7 @@ export async function createDatabase(url: string, opts: { migrate?: boolean } = 
     if (location === "memory" || location === "") {
       client = new PGlite();
     } else {
-      const dir = path.resolve(process.cwd(), location);
+      const dir = path.resolve(/* turbopackIgnore: true */ process.cwd(), location);
       fs.mkdirSync(dir, { recursive: true });
       client = new PGlite(dir);
     }

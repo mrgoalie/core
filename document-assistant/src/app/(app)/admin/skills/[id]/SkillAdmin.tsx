@@ -126,15 +126,15 @@ export function SkillAdmin({ skillId }: { skillId: string }) {
         </Alert>
       ))}
 
-      <div className="seg" role="tablist" aria-label="Skill sections" style={{ alignSelf: "flex-start" }}>
-        <button type="button" role="tab" aria-selected={tab === "edit"} aria-pressed={tab === "edit"} onClick={() => setTab("edit")}>
+      <div className="seg" role="group" aria-label="Skill sections" style={{ alignSelf: "flex-start" }}>
+        <button type="button" aria-pressed={tab === "edit"} onClick={() => setTab("edit")}>
           {isAdmin ? "Edit" : "Review settings"}
         </button>
-        <button type="button" role="tab" aria-selected={tab === "versions"} aria-pressed={tab === "versions"} onClick={() => setTab("versions")}>
+        <button type="button" aria-pressed={tab === "versions"} onClick={() => setTab("versions")}>
           <History size={16} aria-hidden="true" style={{ verticalAlign: "-3px" }} /> Versions &amp; publishing
         </button>
         {isAdmin ? (
-          <button type="button" role="tab" aria-selected={tab === "access"} aria-pressed={tab === "access"} onClick={() => setTab("access")}>
+          <button type="button" aria-pressed={tab === "access"} onClick={() => setTab("access")}>
             <Users size={16} aria-hidden="true" style={{ verticalAlign: "-3px" }} /> Who can use it
           </button>
         ) : null}

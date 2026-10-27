@@ -72,7 +72,7 @@ function loadKey(): Buffer {
   }
   if (config.isProduction) throw new Error("STORAGE_ENCRYPTION_KEY is required");
   // Development only: generate and remember a local key so restarts can read earlier files.
-  const file = path.resolve(process.cwd(), "data", "dev-encryption-key");
+  const file = path.resolve(/* turbopackIgnore: true */ process.cwd(), "data", "dev-encryption-key");
   if (fs.existsSync(file)) return Buffer.from(fs.readFileSync(file, "utf8").trim(), "base64");
   const key = crypto.randomBytes(32);
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -129,7 +129,7 @@ export function getStorage(): EncryptedStorage {
   const backend =
     config.STORAGE_DRIVER === "azure-blob"
       ? new AzureBlobBackend(required(config.AZURE_STORAGE_ACCOUNT_URL, "AZURE_STORAGE_ACCOUNT_URL"), config.AZURE_STORAGE_CONTAINER)
-      : new LocalBackend(path.resolve(process.cwd(), config.STORAGE_LOCAL_DIR));
+      : new LocalBackend(path.resolve(/* turbopackIgnore: true */ process.cwd(), config.STORAGE_LOCAL_DIR));
   g.__fdaStorage = new EncryptedStorage(backend, getEncryptionKey());
   return g.__fdaStorage;
 }

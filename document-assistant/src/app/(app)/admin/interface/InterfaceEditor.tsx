@@ -166,9 +166,9 @@ export function InterfaceEditor() {
 
       <div className="grid-2" style={{ gridTemplateColumns: "minmax(0, 0.9fr) minmax(0, 1.1fr)", alignItems: "start" }}>
         <div className="stack">
-          <div className="seg" role="tablist" aria-label="Editor sections" style={{ flexWrap: "wrap" }}>
+          <div className="seg" role="group" aria-label="Editor sections" style={{ flexWrap: "wrap" }}>
             {(["branding", "home", "skills", "navigation"] as const).map((t) => (
-              <button key={t} type="button" role="tab" aria-selected={tab === t} aria-pressed={tab === t} onClick={() => setTab(t)}>
+              <button key={t} type="button" aria-pressed={tab === t} onClick={() => setTab(t)}>
                 {{ branding: "Branding", home: "Home screen", skills: "Skills on home screen", navigation: "Navigation" }[t]}
               </button>
             ))}

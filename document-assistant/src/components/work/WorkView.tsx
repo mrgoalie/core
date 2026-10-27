@@ -262,6 +262,9 @@ function StepInformation({ view, setView, reload, back, next }: { view: View; se
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [err, setErr] = useState<ApiError | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
+  // Ticking a document responds immediately; the server confirms (or the tick is undone on error).
+  const [localSel, setLocalSel] = useState<Record<string, boolean>>({});
+  const selSeq = useRef<Record<string, number>>({});
   const onFinished = useCallback(
     async (j: Job) => {
       const v = await reload();
@@ -302,13 +305,23 @@ function StepInformation({ view, setView, reload, back, next }: { view: View; se
   };
   useEffect(() => () => void flush(), [flush]);
 
-  async function docChange(docId: string, body: Record<string, unknown>) {
+  async function docChange(docId: string, body: { selected?: boolean; requirementId?: string }) {
     setErr(null);
+    const n = (selSeq.current[docId] ?? 0) + 1;
+    selSeq.current[docId] = n;
+    if (body.selected !== undefined) setLocalSel((m) => ({ ...m, [docId]: body.selected! }));
     try {
       await api(`/api/work/${sid}/documents/${docId}`, { method: "PATCH", body });
       await reload();
     } catch (e) {
       setErr(e as ApiError);
+    } finally {
+      // Only the most recent change for this document may clear the on-screen state.
+      if (selSeq.current[docId] === n)
+        setLocalSel((m) => {
+          const { [docId]: _, ...rest } = m;
+          return rest;
+        });
     }
   }
   async function removeDoc(docId: string) {
@@ -439,7 +452,7 @@ function StepInformation({ view, setView, reload, back, next }: { view: View; se
                     {docs.map((d) => (
                       <div key={d.id} className="doc-row">
                         <label className="check" style={{ flex: 1, minWidth: 220 }}>
-                          <input type="checkbox" checked={d.selected} disabled={!editable} onChange={(e) => docChange(d.id, { selected: e.target.checked })} />
+                          <input type="checkbox" checked={localSel[d.id] ?? d.selected} disabled={!editable} onChange={(e) => docChange(d.id, { selected: e.target.checked })} />
                           <span>
                             {d.fileName}
                             <span className="small muted" style={{ display: "block" }}>

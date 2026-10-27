@@ -135,7 +135,7 @@ export function EmployeeDetail({ id }: { id: string }) {
       <section className="card" aria-labelledby="act-h">
         <h2 id="act-h">Recent activity</h2>
         {e.activity.length === 0 ? <p className="muted">No activity yet.</p> : (
-          <div className="table-wrap">
+          <div className="table-wrap" tabIndex={0} role="region" aria-label="Scrollable table">
             <table className="table">
               <thead>
                 <tr><th scope="col">When</th><th scope="col">What</th><th scope="col">By</th><th scope="col">Result</th></tr>

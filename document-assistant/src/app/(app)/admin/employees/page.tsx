@@ -52,7 +52,7 @@ export default function EmployeesPage() {
         <label htmlFor="emp-q">Find someone</label>
         <input id="emp-q" type="search" value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
-      <div className="table-wrap">
+      <div className="table-wrap" tabIndex={0} role="region" aria-label="Scrollable table">
         <table className="table">
           <caption className="sr-only">Employees</caption>
           <thead>

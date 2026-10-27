@@ -193,6 +193,8 @@ export function SkillEditor({
   const [dirty, setDirty] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
   const [summary, setSummary] = useState("");
+  // Identifiers of items added in this editing session; renamed from their wording on save.
+  const [fresh] = useState(() => new Set<string>());
   const edit = (fn: (d: Cfg) => void) => {
     setCfg((prev) => {
       const d = structuredClone(prev);
@@ -233,8 +235,11 @@ export function SkillEditor({
   };
 
   async function save() {
-    const ok = await onSave(cfg, summary);
+    const final = finalizeIds(cfg, fresh);
+    const ok = await onSave(final, summary);
     if (ok) {
+      setCfg(final);
+      fresh.clear();
       setDirty(false);
       setSummary("");
     }
@@ -280,7 +285,21 @@ export function SkillEditor({
           "1. Name and description",
           "What employees see on the home screen.",
           <div className="stack">
-            <Txt id="sk-name" label="Skill name" required value={cfg.name} disabled={ro} onChange={(v) => edit((d) => void (d.name = v))} hint="Example: Prepare Settlement Disbursement" />
+            <Txt
+              id="sk-name"
+              label="Skill name"
+              required
+              value={cfg.name}
+              disabled={ro}
+              hint="Example: Prepare Settlement Disbursement"
+              onChange={(v) =>
+                edit((d) => {
+                  // Keep the document title in step with the name until someone sets a different title.
+                  if (!d.output.documentTitle || d.output.documentTitle === d.name) d.output.documentTitle = v;
+                  d.name = v;
+                })
+              }
+            />
             <Txt id="sk-desc" label="Short description" required multiline rows={2} value={cfg.shortDescription} disabled={ro} onChange={(v) => edit((d) => void (d.shortDescription = v))} />
             <Txt id="sk-instr" label="Employee instructions" multiline rows={3} value={cfg.employeeInstructions} disabled={ro} onChange={(v) => edit((d) => void (d.employeeInstructions = v))} hint="A short explanation shown to employees while they use the skill." />
             <Txt id="sk-cat" label="Category" value={cfg.category} disabled={ro} onChange={(v) => edit((d) => void (d.category = v))} />
@@ -346,7 +365,7 @@ export function SkillEditor({
             {cfg.inputs.length === 0 ? <div className="empty">No questions yet.</div> : null}
             {cfg.inputs.map((inp, i) => (
               <ItemShell
-                key={inp.id}
+                key={i}
                 label={`question ${inp.label}`}
                 readOnly={ro}
                 title={
@@ -354,12 +373,12 @@ export function SkillEditor({
                     {inp.label} {inp.required ? <span className="badge badge-warning">Required</span> : <span className="badge badge-neutral">Optional</span>}
                   </>
                 }
-                sub={`${INPUT_TYPES.find((t) => t.key === inp.type)?.label} · placeholder {{${inp.id}}}`}
-                open={open === `in-${inp.id}`}
-                onToggle={() => setOpen(open === `in-${inp.id}` ? null : `in-${inp.id}`)}
-                onUp={() => edit((d) => void (d.inputs = move(d.inputs, i, -1)))}
-                onDown={() => edit((d) => void (d.inputs = move(d.inputs, i, 1)))}
-                onDelete={() => edit((d) => void d.inputs.splice(i, 1))}
+                sub={`${INPUT_TYPES.find((t) => t.key === inp.type)?.label} · ${fresh.has(inp.id) ? "placeholder is named when you save" : `placeholder {{${inp.id}}}`}`}
+                open={open === `in-${i}`}
+                onToggle={() => setOpen(open === `in-${i}` ? null : `in-${i}`)}
+                onUp={() => { setOpen(null); edit((d) => void (d.inputs = move(d.inputs, i, -1))); }}
+                onDown={() => { setOpen(null); edit((d) => void (d.inputs = move(d.inputs, i, 1))); }}
+                onDelete={() => { setOpen(null); edit((d) => void d.inputs.splice(i, 1)); }}
               >
                 <div className="stack">
                   <Txt id={`in-${i}-label`} label="Question" value={inp.label} disabled={ro} onChange={(v) => edit((d) => void (d.inputs[i].label = v))} />
@@ -428,8 +447,9 @@ export function SkillEditor({
               <div style={{ marginTop: 14 }}>
                 <Button variant="secondary" onClick={() => {
                   const id = slugify("new question", ids());
+                  fresh.add(id);
                   edit((d) => void d.inputs.push({ id, label: "New question", type: "text", required: false }));
-                  setOpen(`in-${id}`);
+                  setOpen(`in-${cfg.inputs.length}`);
                 }}>
                   <Plus size={18} aria-hidden="true" /> Add a question
                 </Button>
@@ -446,7 +466,7 @@ export function SkillEditor({
             {cfg.documents.length === 0 ? <div className="empty">No documents required.</div> : null}
             {cfg.documents.map((doc, i) => (
               <ItemShell
-                key={doc.id}
+                key={i}
                 label={`document ${doc.label}`}
                 readOnly={ro}
                 title={
@@ -455,11 +475,11 @@ export function SkillEditor({
                   </>
                 }
                 sub={ANALYZERS.find((a) => a.key === (doc.analyzer ?? "none"))?.label}
-                open={open === `doc-${doc.id}`}
-                onToggle={() => setOpen(open === `doc-${doc.id}` ? null : `doc-${doc.id}`)}
-                onUp={() => edit((d) => void (d.documents = move(d.documents, i, -1)))}
-                onDown={() => edit((d) => void (d.documents = move(d.documents, i, 1)))}
-                onDelete={() => edit((d) => void d.documents.splice(i, 1))}
+                open={open === `doc-${i}`}
+                onToggle={() => setOpen(open === `doc-${i}` ? null : `doc-${i}`)}
+                onUp={() => { setOpen(null); edit((d) => void (d.documents = move(d.documents, i, -1))); }}
+                onDown={() => { setOpen(null); edit((d) => void (d.documents = move(d.documents, i, 1))); }}
+                onDelete={() => { setOpen(null); edit((d) => void d.documents.splice(i, 1)); }}
               >
                 <div className="stack">
                   <Txt id={`doc-${i}-l`} label="Name on the checklist" value={doc.label} disabled={ro} onChange={(v) => edit((d) => void (d.documents[i].label = v))} />
@@ -484,7 +504,7 @@ export function SkillEditor({
                 <Button variant="secondary" onClick={() => {
                   const id = slugify("document", cfg.documents.map((d) => d.id));
                   edit((d) => void d.documents.push({ id, label: "New document", categories: ["other"], required: true, multiple: true, analyzer: "none" }));
-                  setOpen(`doc-${id}`);
+                  setOpen(`doc-${cfg.documents.length}`);
                 }}>
                   <Plus size={18} aria-hidden="true" /> Add a document
                 </Button>
@@ -502,16 +522,16 @@ export function SkillEditor({
             {cfg.calculations.length === 0 ? <div className="empty">No calculations.</div> : null}
             {cfg.calculations.map((c, i) => (
               <ItemShell
-                key={c.id}
+                key={i}
                 label={`calculation ${c.label}`}
                 readOnly={ro}
                 title={c.label}
-                sub={`${CALC_OPERATIONS.find((o) => o.key === c.operation)?.label} · placeholder {{${c.id}}}`}
-                open={open === `calc-${c.id}`}
-                onToggle={() => setOpen(open === `calc-${c.id}` ? null : `calc-${c.id}`)}
-                onUp={() => edit((d) => void (d.calculations = move(d.calculations, i, -1)))}
-                onDown={() => edit((d) => void (d.calculations = move(d.calculations, i, 1)))}
-                onDelete={() => edit((d) => void d.calculations.splice(i, 1))}
+                sub={`${CALC_OPERATIONS.find((o) => o.key === c.operation)?.label} · ${fresh.has(c.id) ? "placeholder is named when you save" : `placeholder {{${c.id}}}`}`}
+                open={open === `calc-${i}`}
+                onToggle={() => setOpen(open === `calc-${i}` ? null : `calc-${i}`)}
+                onUp={() => { setOpen(null); edit((d) => void (d.calculations = move(d.calculations, i, -1))); }}
+                onDown={() => { setOpen(null); edit((d) => void (d.calculations = move(d.calculations, i, 1))); }}
+                onDelete={() => { setOpen(null); edit((d) => void d.calculations.splice(i, 1)); }}
               >
                 <div className="stack">
                   <Txt id={`c-${i}-l`} label="Name" value={c.label} disabled={ro} onChange={(v) => edit((d) => void (d.calculations[i].label = v))} />
@@ -545,8 +565,9 @@ export function SkillEditor({
               <div style={{ marginTop: 14 }}>
                 <Button variant="secondary" onClick={() => {
                   const id = slugify("total", ids());
+                  fresh.add(id);
                   edit((d) => void d.calculations.push({ id, label: "New total", operation: "add", operands: [], format: "currency", showInDocument: true }));
-                  setOpen(`calc-${id}`);
+                  setOpen(`calc-${cfg.calculations.length}`);
                 }}>
                   <Plus size={18} aria-hidden="true" /> Add a calculation
                 </Button>
@@ -562,16 +583,16 @@ export function SkillEditor({
           <div>
             {(cfg.drafting.sections ?? []).map((s, i) => (
               <ItemShell
-                key={s.id}
+                key={i}
                 label={`section ${s.heading || s.id}`}
                 readOnly={ro}
                 title={s.heading || <span className="muted">(no heading)</span>}
                 sub={s.mode === "ai" ? "Written by AI from the facts" : "Fixed text"}
-                open={open === `sec-${s.id}`}
-                onToggle={() => setOpen(open === `sec-${s.id}` ? null : `sec-${s.id}`)}
-                onUp={() => edit((d) => void (d.drafting.sections = move(d.drafting.sections!, i, -1)))}
-                onDown={() => edit((d) => void (d.drafting.sections = move(d.drafting.sections!, i, 1)))}
-                onDelete={() => edit((d) => void d.drafting.sections!.splice(i, 1))}
+                open={open === `sec-${i}`}
+                onToggle={() => setOpen(open === `sec-${i}` ? null : `sec-${i}`)}
+                onUp={() => { setOpen(null); edit((d) => void (d.drafting.sections = move(d.drafting.sections!, i, -1))); }}
+                onDown={() => { setOpen(null); edit((d) => void (d.drafting.sections = move(d.drafting.sections!, i, 1))); }}
+                onDelete={() => { setOpen(null); edit((d) => void d.drafting.sections!.splice(i, 1)); }}
               >
                 <SectionBody s={s} i={i} ro={ro} edit={edit} tableInputs={tableInputs} inputs={cfg.inputs} />
               </ItemShell>
@@ -581,7 +602,7 @@ export function SkillEditor({
                 <Button variant="secondary" onClick={() => {
                   const id = slugify("section", (cfg.drafting.sections ?? []).map((s) => s.id));
                   edit((d) => void d.drafting.sections!.push({ id, heading: "New section", mode: "ai", instructions: "Describe what this section should say." }));
-                  setOpen(`sec-${id}`);
+                  setOpen(`sec-${(cfg.drafting.sections ?? []).length}`);
                 }}>
                   <Plus size={18} aria-hidden="true" /> Add a section
                 </Button>
@@ -751,6 +772,38 @@ export function SkillEditor({
       </nav>
     </div>
   );
+}
+
+/**
+ * Items added during this editing session get their placeholder name from their wording when saved
+ * (e.g. "Settlement amount" → {{settlement_amount}}), and every reference to them is updated.
+ */
+export function finalizeIds(c: Cfg, fresh: Set<string>): Cfg {
+  const d = structuredClone(c);
+  const taken = new Set([...d.inputs.map((i) => i.id), ...d.calculations.map((x) => x.id)].filter((id) => !fresh.has(id)));
+  const rename = new Map<string, string>();
+  for (const item of [...d.inputs, ...d.calculations]) {
+    if (!fresh.has(item.id)) continue;
+    const id = slugify(item.label || "field", taken);
+    taken.add(id);
+    if (id !== item.id) rename.set(item.id, id);
+    item.id = id;
+  }
+  if (!rename.size) return d;
+  const r = (id: string) => rename.get(id) ?? id;
+  for (const calc of d.calculations) calc.operands = calc.operands.map((o) => (o.kind === "input" ? { ...o, inputId: r(o.inputId) } : o.kind === "calc" ? { ...o, calcId: r(o.calcId) } : o));
+  for (const inp of d.inputs) if (inp.showWhen) inp.showWhen = { ...inp.showWhen, inputId: r(inp.showWhen.inputId) };
+  for (const doc of d.documents) if (doc.appliesWhen) doc.appliesWhen = { ...doc.appliesWhen, inputId: r(doc.appliesWhen.inputId) };
+  for (const s of d.drafting.sections ?? []) {
+    if (s.showWhen) s.showWhen = { ...s.showWhen, inputId: r(s.showWhen.inputId) };
+    if (s.attach) s.attach = { ...s.attach, tables: (s.attach.tables ?? []).map(r) };
+    if (s.text) s.text = s.text.replace(/\{\{\s*([a-z0-9_]+)\s*\}\}/g, (m, k: string) => (rename.has(k) ? `{{${rename.get(k)}}}` : m));
+  }
+  if (d.output.letter) {
+    d.output.letter.recipientInputIds = (d.output.letter.recipientInputIds ?? []).map(r);
+    d.output.letter.reLines = (d.output.letter.reLines ?? []).map((l) => (l.source.kind === "input" ? { ...l, source: { ...l.source, inputId: r(l.source.inputId) } } : l));
+  }
+  return d;
 }
 
 function OperandRow({ idp, operand, onChange, onRemove, numericSources, priorCalcs, disabled }: { idp: string; operand: Operand; onChange: (o: Operand) => void; onRemove: () => void; numericSources: { value: string; label: string }[]; priorCalcs: Calc[]; disabled?: boolean }) {
