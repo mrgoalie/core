@@ -19,8 +19,39 @@ export const DEMO = {
   chris: "chris.novak@demo.fabbrinilaw.test",
 };
 
+/**
+ * A fresh, migrated database per test file. By default an in-memory PostgreSQL (PGlite); set
+ * TEST_DATABASE_URL=postgres://… to run against a real PostgreSQL server with the production driver.
+ */
+async function testDatabaseUrl(): Promise<{ url: string; drop: () => Promise<void> }> {
+  const server = process.env.TEST_DATABASE_URL;
+  if (!server) return { url: "pglite:memory", drop: async () => undefined };
+  const pg = (await import("pg")).default;
+  const name = `fda_test_${crypto.randomBytes(5).toString("hex")}`;
+  const admin = new pg.Client({ connectionString: server });
+  await admin.connect();
+  await admin.query(`create database ${name}`);
+  await admin.end();
+  const u = new URL(server);
+  u.pathname = `/${name}`;
+  return {
+    url: u.toString(),
+    drop: async () => {
+      const a = new pg.Client({ connectionString: server });
+      await a.connect();
+      await a.query(`drop database if exists ${name} with (force)`);
+      await a.end();
+    },
+  };
+}
+
 export async function freshDb() {
-  const { db, close } = await createDatabase("pglite:memory", { migrate: true });
+  const target = await testDatabaseUrl();
+  const { db, close: closeDb } = await createDatabase(target.url, { migrate: true });
+  const close = async () => {
+    await closeDb();
+    await target.drop();
+  };
   setDbForTesting(db);
   setStorageForTesting(new EncryptedStorage(new MemoryBackend(), crypto.randomBytes(32)));
   setAiProviderForTesting(null);

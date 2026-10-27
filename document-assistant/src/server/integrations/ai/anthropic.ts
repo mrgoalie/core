@@ -20,13 +20,17 @@ export class AnthropicProvider implements AiProvider {
     apiKey: string,
     private readonly model: string,
     private readonly fallbacks: boolean,
+    /** Injectable for tests; production uses the platform fetch. */
+    fetchImpl?: typeof fetch,
   ) {
-    this.client = new Anthropic({ apiKey, maxRetries: 2, timeout: 180_000 });
+    this.client = new Anthropic({ apiKey, maxRetries: 2, timeout: 180_000, ...(fetchImpl ? { fetch: fetchImpl } : {}) });
   }
 
   async generate<T>(req: AiRequest<T>): Promise<AiResponse<T>> {
     try {
-      const response = await this.client.beta.messages.parse({
+      // The structured-output format is passed to create() and parsed here, so the stop reason is
+      // always checked first (a refusal has no JSON to parse and must not be retried).
+      const response = await this.client.beta.messages.create({
         model: this.model,
         max_tokens: req.maxTokens,
         system: req.system,
@@ -36,9 +40,16 @@ export class AnthropicProvider implements AiProvider {
       });
       if (response.stop_reason === "refusal") throw new AiError("refused", "The AI service declined this request.");
       if (response.stop_reason === "max_tokens") throw new AiError("truncated", "The AI response was cut off before it finished.", true);
-      const data = response.parsed_output as T | null;
-      if (!data) throw new AiError("invalid_output", "The AI response was not in the expected format.", true);
-      return { data, model: response.model, inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens };
+      const text = response.content.map((b) => (b.type === "text" ? b.text : "")).join("");
+      let json: unknown;
+      try {
+        json = JSON.parse(text);
+      } catch {
+        throw new AiError("invalid_output", "The AI response was not in the expected format.", true);
+      }
+      const parsed = req.schema.safeParse(json);
+      if (!parsed.success) throw new AiError("invalid_output", "The AI response was not in the expected format.", true);
+      return { data: parsed.data, model: response.model, inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens };
     } catch (err) {
       if (err instanceof AiError) throw err;
       if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError)

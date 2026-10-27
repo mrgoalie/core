@@ -1,0 +1,15 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "appName": { "value": "flgdocassist" },
+    "location": { "value": "centralus" },
+    "appBaseUrl": { "value": "https://ai.windycitylawfirm.com" },
+    "entraTenantId": { "value": "<directory (tenant) ID>" },
+    "entraClientId": { "value": "<application (client) ID>" },
+    "bootstrapAdminEmails": { "value": "<owner work email>" },
+    "imageTag": { "value": "document-assistant:1.0.0" },
+    "appServiceSku": { "value": "P0v3" },
+    "caseManagement": { "value": "mock" }
+  }
+}

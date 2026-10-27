@@ -118,9 +118,10 @@ export async function getJob(db: DB, id: string) {
 
 const g = globalThis as unknown as { __fdaWorker?: NodeJS.Timeout; __fdaWorkerBusy?: boolean };
 
-export function startWorker(getDb: () => Promise<DB>, intervalMs = 750) {
+export function startWorker(getDb: () => Promise<DB>, intervalMs = 750, maintenance?: (db: DB) => Promise<unknown>) {
   if (g.__fdaWorker) return;
   let lastRecovery = 0;
+  let lastMaintenance = Date.now() - 5.9 * 3600_000; // first run about a minute after start-up
   g.__fdaWorker = setInterval(async () => {
     if (g.__fdaWorkerBusy) return;
     g.__fdaWorkerBusy = true;
@@ -131,6 +132,10 @@ export function startWorker(getDb: () => Promise<DB>, intervalMs = 750) {
         await recoverStaleJobs(db);
       }
       await processAvailableJobs(db, 5);
+      if (maintenance && Date.now() - lastMaintenance > 6 * 3600_000) {
+        lastMaintenance = Date.now();
+        await maintenance(db).catch((err) => console.error("[jobs] maintenance failed:", (err as Error).message));
+      }
     } catch (err) {
       console.error("[jobs] worker loop error:", (err as Error).message);
     } finally {

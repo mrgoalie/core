@@ -357,19 +357,27 @@ function StepInformation({ view, setView, reload, back, next }: { view: View; se
       setErr(e as ApiError);
     }
   }
-  async function move(docId: string, dir: -1 | 1, order: string[]) {
-    const i = order.indexOf(docId);
+  // Exhibit order changes apply on screen immediately from the latest order, and are saved one at a
+  // time in sequence so quick repeated clicks are never lost or saved out of order.
+  const [localOrder, setLocalOrder] = useState<string[] | null>(null);
+  const orderRef = useRef<string[]>([]);
+  const saveChain = useRef<Promise<unknown>>(Promise.resolve());
+  function move(docId: string, dir: -1 | 1) {
+    const cur = orderRef.current;
+    const i = cur.indexOf(docId);
     const j = i + dir;
-    if (i < 0 || j < 0 || j >= order.length) return;
-    const next = [...order];
+    if (i < 0 || j < 0 || j >= cur.length) return;
+    const next = [...cur];
     [next[i], next[j]] = [next[j], next[i]];
-    try {
-      await api(`/api/work/${sid}/exhibits`, { method: "PUT", body: { order: next } });
-      await reload();
-      setTimeout(() => document.getElementById(`move-${docId}-${dir === -1 ? "up" : "down"}`)?.focus(), 30);
-    } catch (e) {
-      setErr(e as ApiError);
-    }
+    orderRef.current = next;
+    setLocalOrder(next);
+    setTimeout(() => document.getElementById(`move-${docId}-${dir === -1 ? "up" : "down"}`)?.focus(), 30);
+    saveChain.current = saveChain.current.then(() =>
+      api(`/api/work/${sid}/exhibits`, { method: "PUT", body: { order: next } }).catch((e) => {
+        setErr(e as ApiError);
+        setLocalOrder(null);
+      }),
+    );
   }
 
   const applicable = cfg.documents.filter((r) => isVisible(r.appliesWhen, answers));
@@ -378,12 +386,13 @@ function StepInformation({ view, setView, reload, back, next }: { view: View; se
   const isPackage = cfg.output.formats.includes("pdf_package");
   const selectedDocs = view.documents.filter((d) => d.selected);
   const order = useMemo(() => {
-    const saved = (view.data.exhibitOrder ?? []).filter((id) => selectedDocs.some((d) => d.id === id));
+    const saved = (localOrder ?? view.data.exhibitOrder ?? []).filter((id) => selectedDocs.some((d) => d.id === id));
     const rest = selectedDocs
       .filter((d) => !saved.includes(d.id))
       .sort((a, b) => cfg.documents.findIndex((r) => r.id === a.requirementId) - cfg.documents.findIndex((r) => r.id === b.requirementId));
     return [...saved, ...rest.map((d) => d.id)];
-  }, [view.data.exhibitOrder, selectedDocs, cfg.documents]);
+  }, [localOrder, view.data.exhibitOrder, selectedDocs, cfg.documents]);
+  orderRef.current = order;
   const visibleInputs = cfg.inputs.filter((i) => isVisible(i.showWhen, answers) && i.type !== "file");
   const groups = [...new Set(visibleInputs.map((i) => i.group ?? ""))];
   const analysis = view.data.analysis;
@@ -522,10 +531,10 @@ function StepInformation({ view, setView, reload, back, next }: { view: View; se
                   <li key={id}>
                     <span className="badge badge-accent">Exhibit {i + 1}</span>
                     <span className="w-main">{d.fileName}</span>
-                    <button id={`move-${id}-up`} type="button" className="icon-btn" disabled={!editable || i === 0} onClick={() => move(id, -1, order)} aria-label={`Move ${d.fileName} up`}>
+                    <button id={`move-${id}-up`} type="button" className="icon-btn" disabled={!editable || i === 0} onClick={() => move(id, -1)} aria-label={`Move ${d.fileName} up`}>
                       <ArrowUp size={18} aria-hidden="true" />
                     </button>
-                    <button id={`move-${id}-down`} type="button" className="icon-btn" disabled={!editable || i === order.length - 1} onClick={() => move(id, 1, order)} aria-label={`Move ${d.fileName} down`}>
+                    <button id={`move-${id}-down`} type="button" className="icon-btn" disabled={!editable || i === order.length - 1} onClick={() => move(id, 1)} aria-label={`Move ${d.fileName} down`}>
                       <ArrowDown size={18} aria-hidden="true" />
                     </button>
                   </li>
@@ -614,7 +623,7 @@ function StepInformation({ view, setView, reload, back, next }: { view: View; se
         </Button>
         <div className="row">
           {missingRequired.length ? <span className="small muted">{missingRequired.length} required answer{missingRequired.length === 1 ? "" : "s"} still blank — the draft will flag {missingRequired.length === 1 ? "it" : "them"}.</span> : null}
-          <Button size="lg" onClick={async () => { await flush(); next(); }}>
+          <Button size="lg" onClick={async () => { await flush(); await saveChain.current; next(); }}>
             Continue <ArrowRight size={20} aria-hidden="true" />
           </Button>
         </div>
